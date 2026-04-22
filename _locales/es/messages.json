@@ -1,0 +1,10 @@
+{
+  "extension_name": {
+    "message": "R2D2 Autenticador Seguro",
+    "description": "Nombre de la extensión"
+  },
+  "extension_description": {
+    "message": "Autenticación de dos factores segura con código 100% transparente",
+    "description": "Descripción de la extensión"
+  }
+}

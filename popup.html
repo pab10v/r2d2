@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="extension.name">Secure Authenticator</title>
+    <link rel="stylesheet" href="popup.css">
+    <style>
+        body {
+            width: 380px;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <h1 data-i18n="extension.name">Secure Authenticator</h1>
+            <div class="header-actions">
+                <button id="add-account-btn" class="btn btn-primary" data-i18n="ui.add_account">+ Add Account</button>
+                <button id="menu-btn" class="btn btn-secondary">...</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Account List -->
+            <div id="account-list" class="account-list">
+                <!-- Accounts will be dynamically added here -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="empty-state" style="display: none;">
+                <div class="empty-icon">...</div>
+                <h2 data-i18n="ui.no_accounts">No Accounts Yet</h2>
+                <p>Add your first 2FA account to get started</p>
+                <button id="add-first-account-btn" class="btn btn-primary" data-i18n="ui.add_first">Add Your First Account</button>
+            </div>
+        </main>
+
+        <!-- Add Account Modal -->
+        <div id="add-account-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 data-i18n="ui.add_account">Add New Account</h2>
+                    <button id="close-modal-btn" class="close-btn">&times;</button>
+                </div>
+                <form id="add-account-form">
+                    <div class="form-group">
+                        <label for="account-name" data-i18n="ui.account_name">Account Name</label>
+                        <input type="text" id="account-name" required placeholder="e.g., Gmail">
+                    </div>
+                    <div class="form-group">
+                        <label for="account-issuer" data-i18n="ui.issuer">Issuer (Optional)</label>
+                        <input type="text" id="account-issuer" placeholder="e.g., Google">
+                    </div>
+                    <div class="form-group">
+                        <label for="account-secret" data-i18n="ui.secret_key">Secret Key</label>
+                        <input type="text" id="account-secret" required placeholder="Base32 secret">
+                        <small>Enter the secret key from your 2FA setup</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="account-digits" data-i18n="ui.digits">Digits</label>
+                        <select id="account-digits">
+                            <option value="6">6 digits</option>
+                            <option value="8">8 digits</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="scan-qr-btn">Or Scan QR Code</label>
+                        <button type="button" id="scan-qr-btn" class="btn btn-secondary">Scan QR Code</button>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="cancel-add-btn" class="btn btn-secondary" data-i18n="ui.cancel">Cancel</button>
+                        <button type="submit" class="btn btn-primary" data-i18n="ui.add_account">Add Account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Menu Dropdown -->
+        <div id="menu-dropdown" class="dropdown" style="display: none;">
+            <button id="export-btn" class="dropdown-item" data-i18n="ui.export">Export Accounts</button>
+            <button id="import-btn" class="dropdown-item" data-i18n="ui.import">Import Accounts</button>
+            <button id="sounds-toggle-btn" class="dropdown-item">R2D2 Sounds: ON</button>
+            <button id="test-sounds-btn" class="dropdown-item">Test R2D2 Sounds</button>
+            <button id="settings-btn" class="dropdown-item" data-i18n="ui.settings">Settings</button>
+        </div>
+
+        <!-- Import Modal -->
+        <div id="import-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 data-i18n="ui.restore_accounts">Import Accounts</h2>
+                    <button id="close-import-modal-btn" class="close-btn">&times;</button>
+                </div>
+                <div class="form-group">
+                    <label for="import-data">Paste Export Data</label>
+                    <textarea id="import-data" rows="10" placeholder="Paste JSON or otpauth:// export data here..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancel-import-btn" class="btn btn-secondary" data-i18n="ui.cancel">Cancel</button>
+                    <button type="button" id="confirm-import-btn" class="btn btn-primary" data-i18n="ui.import">Import</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Modal -->
+        <div id="export-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 data-i18n="ui.backup_accounts">Export Accounts</h2>
+                    <button id="close-export-modal-btn" class="close-btn">&times;</button>
+                </div>
+                <div class="form-group">
+                    <label for="export-data">Export Data</label>
+                    <textarea id="export-data" rows="10" readonly></textarea>
+                    <small>Save this data securely for backup purposes</small>
+                </div>
+                <div class="form-actions">
+                    <button id="copy-export-btn" class="btn btn-secondary" data-i18n="ui.copy">Copy to Clipboard</button>
+                    <button id="close-export-btn" class="btn btn-primary">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="i18n.js"></script>
+    <script src="r2d2-sounds.js"></script>
+    <script src="totp.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>

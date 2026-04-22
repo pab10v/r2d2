@@ -1,0 +1,39 @@
+{
+  "extension": {
+    "name": "R2D2 Secure Authenticator",
+    "description": "Secure two-factor authentication with 100% transparent code"
+  },
+  "ui": {
+    "add_account": "Add Account",
+    "edit_account": "Edit Account",
+    "delete_account": "Delete Account",
+    "account_name": "Account Name",
+    "issuer": "Issuer",
+    "secret_key": "Secret Key",
+    "digits": "Digits",
+    "copy": "Copy",
+    "copied": "Copied",
+    "export": "Export",
+    "import": "Import",
+    "settings": "Settings",
+    "no_accounts": "No Accounts Yet",
+    "add_first": "Add Your First Account",
+    "backup_accounts": "Backup Your Accounts",
+    "restore_accounts": "Restore Accounts"
+  },
+  "messages": {
+    "account_added": "Account added successfully!",
+    "account_updated": "Account updated successfully!",
+    "account_deleted": "Account deleted successfully!",
+    "invalid_secret": "Invalid secret format. Please enter a valid Base32 secret.",
+    "export_success": "Accounts exported successfully!",
+    "import_success": "Accounts imported successfully!",
+    "no_2fa_accounts": "No 2FA accounts found for this site",
+    "fill_2fa_code": "Fill 2FA code"
+  },
+  "security": {
+    "offline_only": "Works completely offline",
+    "no_data_collection": "No data collection",
+    "transparent_code": "100% transparent code"
+  }
+}

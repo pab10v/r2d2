@@ -1,0 +1,488 @@
+/**
+ * Secure Authenticator Content Script
+ * Handles 2FA field detection and auto-fill functionality
+ */
+
+class SecureAuthenticatorContent {
+  constructor() {
+    this.processedInputs = new Set();
+    this.buttonSVG = this.createButtonSVG();
+    this.init();
+  }
+
+  init() {
+    // Process existing inputs
+    this.processInputs();
+    
+    // Watch for new inputs
+    this.observeDOM();
+    
+    // Listen for messages from background script
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      this.handleMessage(message, sender, sendResponse);
+      return true;
+    });
+  }
+
+  /**
+   * Process all input fields on the page
+   */
+  processInputs() {
+    const inputs = document.querySelectorAll('input:not([data-secure-auth-processed])');
+    
+    inputs.forEach(input => {
+      if (this.is2FAField(input)) {
+        this.addAutofillButton(input);
+        input.setAttribute('data-secure-auth-processed', 'true');
+        this.processedInputs.add(input);
+      }
+    });
+  }
+
+  /**
+   * Check if an input field is likely a 2FA field
+   */
+  is2FAField(input) {
+    // Check autocomplete attribute
+    if (input.autocomplete === 'one-time-code') {
+      return true;
+    }
+
+    // Check input type
+    const validTypes = ['text', 'number', 'tel', ''];
+    if (!validTypes.includes(input.type)) {
+      return false;
+    }
+
+    // Check max length (2FA codes are typically 4-8 digits)
+    if (input.maxLength >= 4 && input.maxLength <= 8) {
+      return true;
+    }
+
+    // Check input mode
+    if (input.inputMode === 'numeric') {
+      return true;
+    }
+
+    // Check field attributes for 2FA-related keywords
+    const keywords = [
+      'otp', 'totp', '2fa', 'mfa', 'two.?factor', 'verification.?code',
+      'auth.?code', 'authenticator', 'security.?code', 'one.?time',
+      'token', 'pin.?code'
+    ];
+
+    const searchText = [
+      input.name,
+      input.id,
+      input.placeholder,
+      input.className,
+      input.getAttribute('aria-label')
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    const hasKeyword = keywords.some(keyword => {
+      try {
+        return new RegExp(keyword, 'i').test(searchText);
+      } catch (e) {
+        return false;
+      }
+    });
+
+    if (hasKeyword) {
+      return true;
+    }
+
+    // Check associated labels
+    const labels = this.getAssociatedLabels(input);
+    return labels.some(label => {
+      const labelText = label.textContent.toLowerCase();
+      return keywords.some(keyword => {
+        try {
+          return new RegExp(keyword, 'i').test(labelText);
+        } catch (e) {
+          return false;
+        }
+      });
+    });
+  }
+
+  /**
+   * Get associated labels for an input
+   */
+  getAssociatedLabels(input) {
+    const labels = [];
+    
+    // Check for explicit label association
+    if (input.id) {
+      const explicitLabel = document.querySelector(`label[for="${input.id}"]`);
+      if (explicitLabel) {
+        labels.push(explicitLabel);
+      }
+    }
+
+    // Check for parent labels
+    if (input.labels && input.labels.length > 0) {
+      labels.push(...Array.from(input.labels));
+    }
+
+    // Check for nearby labels
+    const parent = input.closest('div, form, fieldset');
+    if (parent) {
+      const nearbyLabels = parent.querySelectorAll('label');
+      labels.push(...Array.from(nearbyLabels));
+    }
+
+    return labels;
+  }
+
+  /**
+   * Add autofill button to input field
+   */
+  addAutofillButton(input) {
+    // Create wrapper div
+    const wrapper = document.createElement('div');
+    wrapper.className = 'secure-auth-wrapper';
+    wrapper.style.position = 'relative';
+    wrapper.style.display = 'inline-block';
+
+    // Get computed styles
+    const computedStyle = window.getComputedStyle(input);
+    wrapper.style.width = computedStyle.width;
+
+    // Wrap the input
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+
+    // Create autofill button
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'secure-auth-btn';
+    button.innerHTML = this.buttonSVG;
+    button.title = 'Fill 2FA code';
+    button.setAttribute('aria-label', 'Fill 2FA code');
+    
+    // Style the button
+    button.style.cssText = `
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      z-index: 1000;
+    `;
+
+    // Add hover effect
+    button.addEventListener('mouseenter', () => {
+      button.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+    });
+
+    button.addEventListener('mouseleave', () => {
+      button.style.backgroundColor = 'transparent';
+    });
+
+    // Add click handler
+    button.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showCodePicker(input, button);
+    });
+
+    // Add button to wrapper
+    wrapper.appendChild(button);
+
+    // Add some padding to input to make room for button
+    input.style.paddingRight = '40px';
+  }
+
+  /**
+   * Create SVG for the autofill button
+   */
+  createButtonSVG() {
+    return `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="10" stroke="#4285F4" stroke-width="2" fill="none"/>
+        <path d="M12 8v4l3 3" stroke="#4285F4" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="12" cy="12" r="2" fill="#4285F4"/>
+      </svg>
+    `;
+  }
+
+  /**
+   * Show code picker for selecting 2FA account
+   */
+  async showCodePicker(input, button) {
+    // Remove existing pickers
+    this.removeCodePickers();
+
+    // Get current domain
+    const domain = window.location.hostname;
+    
+    try {
+      // Get TOTP codes for current domain
+      const response = await this.sendMessage({
+        type: 'GET_TOTP_CODES_FOR_DOMAIN',
+        domain: domain
+      });
+
+      if (response.success && response.accounts.length > 0) {
+        this.createCodePicker(input, button, response.accounts, response.bound, domain);
+      } else {
+        this.showError('No 2FA accounts found for this site');
+      }
+    } catch (error) {
+      console.error('Error getting TOTP codes:', error);
+      this.showError('Failed to get 2FA codes');
+    }
+  }
+
+  /**
+   * Create and display code picker UI
+   */
+  createCodePicker(input, button, accounts, isBound, domain) {
+    const picker = document.createElement('div');
+    picker.className = 'secure-auth-picker';
+    
+    // Style the picker
+    picker.style.cssText = `
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 10000;
+      min-width: 280px;
+      max-height: 300px;
+      overflow-y: auto;
+    `;
+
+    // Create header
+    const header = document.createElement('div');
+    header.style.cssText = `
+      padding: 12px 16px;
+      border-bottom: 1px solid #eee;
+      font-weight: 600;
+      font-size: 14px;
+      color: #333;
+    `;
+    header.textContent = isBound ? 'Bound Account' : `Accounts for ${domain}`;
+    picker.appendChild(header);
+
+    // Create account list
+    accounts.forEach(account => {
+      const accountItem = document.createElement('div');
+      accountItem.style.cssText = `
+        padding: 12px 16px;
+        border-bottom: 1px solid #f0f0f0;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      `;
+
+      accountItem.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-weight: 500; color: #333; margin-bottom: 2px;">
+              ${this.escapeHtml(account.issuer || account.name)}
+            </div>
+            <div style="font-size: 12px; color: #666;">
+              ${this.escapeHtml(account.name)}
+            </div>
+          </div>
+          <div style="font-family: monospace; font-size: 18px; font-weight: bold; color: #2196F3; letter-spacing: 2px;">
+            ${this.formatCode(account.code)}
+          </div>
+        </div>
+      `;
+
+      // Add hover effect
+      accountItem.addEventListener('mouseenter', () => {
+        accountItem.style.backgroundColor = '#f8f9fa';
+      });
+
+      accountItem.addEventListener('mouseleave', () => {
+        accountItem.style.backgroundColor = 'transparent';
+      });
+
+      // Add click handler
+      accountItem.addEventListener('click', () => {
+        this.fillCode(input, account.code);
+        this.saveDomainBinding(domain, account.id);
+        this.removeCodePickers();
+      });
+
+      picker.appendChild(accountItem);
+    });
+
+    // Position and show picker
+    const buttonRect = button.getBoundingClientRect();
+    const inputRect = input.getBoundingClientRect();
+    
+    picker.style.top = `${buttonRect.bottom - inputRect.top + 4}px`;
+    picker.style.right = '0';
+
+    input.parentElement.appendChild(picker);
+
+    // Add click outside handler
+    setTimeout(() => {
+      const clickOutsideHandler = (e) => {
+        if (!picker.contains(e.target) && e.target !== button) {
+          this.removeCodePickers();
+          document.removeEventListener('click', clickOutsideHandler);
+        }
+      };
+      document.addEventListener('click', clickOutsideHandler);
+    }, 0);
+  }
+
+  /**
+   * Fill the input field with the selected code
+   */
+  fillCode(input, code) {
+    const cleanCode = code.replace(/\s/g, '');
+    
+    // Try to use the value setter if available
+    const descriptor = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+    if (descriptor && descriptor.set) {
+      descriptor.set.call(input, cleanCode);
+    } else {
+      input.value = cleanCode;
+    }
+
+    // Trigger events
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    
+    // Focus the input
+    input.focus();
+
+    // Visual feedback
+    input.style.backgroundColor = '#e8f5e8';
+    setTimeout(() => {
+      input.style.backgroundColor = '';
+    }, 500);
+  }
+
+  /**
+   * Save domain binding for future use
+   */
+  async saveDomainBinding(domain, accountId) {
+    try {
+      await this.sendMessage({
+        type: 'SAVE_DOMAIN_BINDING',
+        domain: domain,
+        accountId: accountId
+      });
+    } catch (error) {
+      console.error('Error saving domain binding:', error);
+    }
+  }
+
+  /**
+   * Remove all code pickers from the page
+   */
+  removeCodePickers() {
+    const pickers = document.querySelectorAll('.secure-auth-picker');
+    pickers.forEach(picker => picker.remove());
+  }
+
+  /**
+   * Format code with spaces for better readability
+   */
+  formatCode(code) {
+    return code.replace(/(.{3})/g, '$1 ').trim();
+  }
+
+  /**
+   * Escape HTML to prevent XSS
+   */
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  /**
+   * Show error message
+   */
+  showError(message) {
+    // Create toast notification
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #f44336;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-weight: 500;
+      z-index: 10001;
+      max-width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    `;
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.remove();
+    }, 3000);
+  }
+
+  /**
+   * Observe DOM changes for new input fields
+   */
+  observeDOM() {
+    const observer = new MutationObserver((mutations) => {
+      let shouldProcess = false;
+      
+      mutations.forEach((mutation) => {
+        if (mutation.addedNodes.length > 0) {
+          shouldProcess = true;
+        }
+      });
+
+      if (shouldProcess) {
+        // Debounce the processing
+        clearTimeout(this.processTimeout);
+        this.processTimeout = setTimeout(() => {
+          this.processInputs();
+        }, 100);
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  /**
+   * Handle messages from background script
+   */
+  handleMessage(message, sender, sendResponse) {
+    // Handle any messages from background script if needed
+    sendResponse({ success: true });
+  }
+
+  /**
+   * Send message to background script
+   */
+  sendMessage(message) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(message, resolve);
+    });
+  }
+}
+
+// Initialize the content script
+new SecureAuthenticatorContent();

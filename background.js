@@ -10,11 +10,53 @@ class SecureAuthenticator {
   constructor() {
     this.totp  = new self.SecureTOTP(false);
     this.vault = new self.SecureVault();
+    this.vault.setExternalDeriver((pw, salt) => this.deriveKeyOffscreen(pw, salt));
     this.domainBindingKey = 'secure_authenticator_domain_bindings';
+
+    // Initialize time offset from storage
+    this.initTimeOffset();
 
     // Initialize event listeners
     this.initEventListeners();
     this.setupAutoLock();
+    this.OFFSCREEN_PATH = 'sandbox.html';
+  }
+
+  async initTimeOffset() {
+    const data = await chrome.storage.local.get('vault_time_offset');
+    if (data.vault_time_offset) {
+      this.totp.setTimeOffset(data.vault_time_offset);
+    }
+  }
+
+  async syncTime() {
+    try {
+      // Fetch google.com to get its server time from headers
+      const start = Date.now();
+      const response = await fetch('https://www.google.com/generate_204', { 
+        method: 'HEAD',
+        cache: 'no-store'
+      });
+      const end = Date.now();
+      
+      const serverDateStr = response.headers.get('date');
+      if (!serverDateStr) throw new Error('Could not get server date');
+      
+      const serverTime = new Date(serverDateStr).getTime();
+      // Estimate network latency (round trip / 2)
+      const latency = (end - start) / 2;
+      const adjustedServerTime = serverTime + latency;
+      
+      const offset = adjustedServerTime - end;
+      
+      await chrome.storage.local.set({ vault_time_offset: offset });
+      this.totp.setTimeOffset(offset);
+      
+      return { success: true, offset };
+    } catch (error) {
+      console.error('Time sync failed:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   setupAutoLock() {
@@ -106,6 +148,16 @@ class SecureAuthenticator {
             sendResponse({ success: false, error: error.message });
           }
           return;
+        }
+
+        case 'SYNC_TIME': {
+          this.syncTime().then(sendResponse);
+          return true; // Async
+        }
+
+        case 'ARGON2_DERIVE': {
+          this.deriveKeyOffscreen(message.password, message.salt).then(sendResponse);
+          return true; // Async
         }
       }
 
@@ -237,6 +289,58 @@ class SecureAuthenticator {
       console.error('Background script error:', error);
       sendResponse({ success: false, error: error.message });
     }
+  }
+
+  /**
+   * Derive a key using Argon2 via an Offscreen Document
+   */
+  async deriveKeyOffscreen(password, salt) {
+    try {
+      await this.ensureOffscreenDocument();
+      
+      return new Promise((resolve, reject) => {
+        const id = Math.random().toString(36).substring(2);
+        
+        const listener = (message) => {
+          if (message.target === 'offscreen' && message.id === id) {
+            chrome.runtime.onMessage.removeListener(listener);
+            if (message.action === 'derive_key_success') {
+              resolve({ success: true, hash: message.payload.hash });
+            } else {
+              reject(new Error(message.payload.error));
+            }
+          }
+        };
+
+        chrome.runtime.onMessage.addListener(listener);
+
+        chrome.runtime.sendMessage({
+          target: 'offscreen',
+          action: 'derive_key',
+          payload: { password, salt },
+          id: id
+        });
+      });
+    } catch (error) {
+      console.error('Offscreen Argon2 error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async ensureOffscreenDocument() {
+    const existingContexts = await chrome.runtime.getContexts({
+      contextTypes: ['OFFSCREEN_DOCUMENT']
+    });
+
+    if (existingContexts.length > 0) {
+      return;
+    }
+
+    await chrome.offscreen.createDocument({
+      url: this.OFFSCREEN_PATH,
+      reasons: ['LOCAL_STORAGE'], // Using LOCAL_STORAGE as a generic reason for crypto
+      justification: 'Argon2 key derivation for secure vault'
+    });
   }
 
   /**

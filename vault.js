@@ -15,9 +15,15 @@ class SecureVault {
     this.SALT_KEY     = 'r2d2_vault_salt';
     this.VAULT_KEY    = 'r2d2_vault_data';
     this.LEGACY_KEY   = 'secure_authenticator_accounts'; // migration source
-    this.ITERATIONS   = 310_000;
-    this.SALT_LEN     = 16;  // bytes
+    this.SALT_LEN     = 16;
     this.IV_LEN       = 12;  // bytes (AES-GCM recommended)
+    this.KDF_MODE     = 'ARGON2'; // 'PBKDF2' or 'ARGON2'
+    this._externalDeriver = null;
+  }
+
+  /** Set an external function to handle key derivation (e.g. via Offscreen) */
+  setExternalDeriver(deriverFn) {
+    this._externalDeriver = deriverFn;
   }
 
   // ─── Public API ───────────────────────────────────────────────────────────
@@ -65,12 +71,22 @@ class SecureVault {
     if (!saltHex) throw new Error('Vault salt not found');
 
     const salt = this._fromHex(saltHex);
+    const vaultData = (await chrome.storage.local.get(this.VAULT_KEY))[this.VAULT_KEY];
+    const version = vaultData ? vaultData.version : 1;
+
     try {
+      // Use correct KDF based on vault version
+      const originalKdf = this.KDF_MODE;
+      this.KDF_MODE = (version >= 2) ? 'ARGON2' : 'PBKDF2';
+      
       const key = await this._deriveKey(pin, salt);
+      this.KDF_MODE = originalKdf; // restore setting
+
       await this._readVault(key); // throws if PIN is wrong (GCM auth tag fails)
       this._sessionKey = key;
       return true;
-    } catch {
+    } catch (err) {
+      console.error('Unlock failed:', err);
       return false;
     }
   }
@@ -176,7 +192,7 @@ class SecureVault {
     await chrome.storage.local.set({
       [this.SALT_KEY]: this._toHex(salt),
       [this.VAULT_KEY]: {
-        version: 1,
+        version: 2, // Version 2 uses Argon2
         iv:         this._toHex(iv),
         ciphertext: this._toHex(ciphertext)
       }
@@ -184,17 +200,72 @@ class SecureVault {
   }
 
   async _deriveKey(pin, salt) {
-    const pinBytes     = new TextEncoder().encode(pin);
-    const keyMaterial  = await crypto.subtle.importKey(
-      'raw', pinBytes, 'PBKDF2', false, ['deriveKey']
-    );
-    return crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt, iterations: this.ITERATIONS, hash: 'SHA-256' },
-      keyMaterial,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt', 'decrypt']
-    );
+    if (this.KDF_MODE === 'PBKDF2') {
+      const pinBytes     = new TextEncoder().encode(pin);
+      const keyMaterial  = await crypto.subtle.importKey(
+        'raw', pinBytes, 'PBKDF2', false, ['deriveKey']
+      );
+      return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: 310000, hash: 'SHA-256' },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
+    } else {
+      // Argon2 via Sandbox (postMessage)
+      const result = await this._deriveKeyArgon2(pin, salt);
+      
+      // Import the resulting raw hash as a CryptoKey
+      return crypto.subtle.importKey(
+        'raw', 
+        result.hash, 
+        { name: 'AES-GCM' }, 
+        false, 
+        ['encrypt', 'decrypt']
+      );
+    }
+  }
+
+  async _deriveKeyArgon2(pin, salt) {
+    // 1. Try external deriver first (useful for Service Worker)
+    if (this._externalDeriver) {
+      const result = await this._externalDeriver(pin, salt);
+      if (result.success) return result;
+      throw new Error(result.error || 'External derivation failed');
+    }
+
+    // 2. Fallback to local sandbox iframe (Popup context)
+    return new Promise((resolve, reject) => {
+      const id = Math.random().toString(36).substring(2);
+      
+      const listener = (event) => {
+        if (event.data && event.data.id === id) {
+          window.removeEventListener('message', listener);
+          if (event.data.action === 'derive_key_success') {
+            resolve(event.data.payload);
+          } else {
+            reject(new Error(event.data.payload.error));
+          }
+        }
+      };
+
+      window.addEventListener('message', listener);
+      
+      // Look for sandbox iframe
+      const sandbox = document.getElementById('argon-sandbox');
+      if (!sandbox) {
+        window.removeEventListener('message', listener);
+        reject(new Error('Argon2 sandbox not found'));
+        return;
+      }
+
+      sandbox.contentWindow.postMessage({
+        action: 'derive_key',
+        payload: { password: pin, salt: salt },
+        id: id
+      }, '*');
+    });
   }
 
   async _encrypt(plaintext, key) {

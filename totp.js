@@ -9,6 +9,16 @@ class SecureTOTP {
     this.window = 30; // 30-second time window
     this.digits = 6;  // 6-digit codes by default
     this.debug = debug;
+    this.timeOffset = 0; // Time drift in milliseconds
+  }
+
+  /**
+   * Set time offset for synchronization
+   * @param {number} offset - Offset in milliseconds
+   */
+  setTimeOffset(offset) {
+    this.timeOffset = offset || 0;
+    this.log('Time offset updated:', this.timeOffset);
   }
 
   /**
@@ -30,9 +40,30 @@ class SecureTOTP {
    * @returns {Promise<string>} TOTP code
    */
   async generate(secret, timeWindow = this.window, digits = this.digits, algorithm = 'SHA1', timestamp = null) {
+    const currentTime = timestamp || (Date.now() + this.timeOffset);
+    const counter = Math.floor(currentTime / 1000 / timeWindow);
+    return this.generateFromCounter(secret, counter, digits, algorithm);
+  }
+
+  /**
+   * Generate an HOTP code (RFC 4226)
+   * @param {string} secret - Base32 encoded secret
+   * @param {number} counter - Counter value
+   * @param {number} digits - Number of digits
+   * @param {string} algorithm - Hash algorithm
+   * @returns {Promise<string>} HOTP code
+   */
+  async generateHOTP(secret, counter, digits = this.digits, algorithm = 'SHA1') {
+    return this.generateFromCounter(secret, counter, digits, algorithm);
+  }
+
+  /**
+   * Core generator implementation (RFC 4226)
+   */
+  async generateFromCounter(secret, counter, digits = this.digits, algorithm = 'SHA1') {
     try {
       this.log('=== TOTP GENERATION START ===');
-      this.log('Input parameters', { secret, timeWindow, digits, algorithm, timestamp });
+      this.log('Input parameters', { secret, counter, digits, algorithm });
       
       // RFC 6238: Validate parameters
       if (!secret || typeof secret !== 'string') {
@@ -40,9 +71,6 @@ class SecureTOTP {
       }
       if (![6, 7, 8].includes(digits)) {
         throw new Error('Digits must be 6, 7, or 8');
-      }
-      if (![30, 60, 90].includes(timeWindow)) {
-        throw new Error('Time step must be 30, 60, or 90 seconds');
       }
       if (!['SHA1', 'SHA256', 'SHA512'].includes(algorithm)) {
         throw new Error('Algorithm must be SHA1, SHA256, or SHA512');
@@ -52,12 +80,10 @@ class SecureTOTP {
       const decodedSecret = this.base32Decode(secret);
       this.log('Decoded secret', Array.from(decodedSecret));
       
-      // RFC 6238: Get current time counter
-      const currentTime = timestamp || Date.now();
-      const counter = Math.floor(currentTime / 1000 / timeWindow);
-      this.log('Time info', { currentTime, counter, timeWindow });
+      // RFC 4226: Use provided counter
+      this.log('Counter info', { counter });
       
-      // Generate counter bytes for debugging
+      // Generate counter bytes
       const counterBytes = this.intToBytes(counter);
       this.log('Counter bytes', Array.from(counterBytes));
       
@@ -185,9 +211,10 @@ class SecureTOTP {
    * @returns {number} Remaining seconds
    */
   getRemainingTime(timeWindow = this.window) {
-    const now = Math.floor(Date.now() / 1000);
-    const nextWindow = Math.ceil(now / timeWindow) * timeWindow;
-    return nextWindow - now;
+    const now = Date.now() + this.timeOffset;
+    const periodMs = timeWindow * 1000;
+    const elapsedMs = now % periodMs;
+    return Math.ceil((periodMs - elapsedMs) / 1000);
   }
 
   /**
@@ -274,7 +301,7 @@ class SecureTOTP {
     const counter = Math.floor(Date.now() / 1000 / this.window);
 
     for (let i = -window; i <= window; i++) {
-      const testToken = await this.generate(secret, this.window, this.digits);
+      const testToken = await this.generateFromCounter(secret, counter + i, this.digits);
       if (testToken === token) {
         return true;
       }

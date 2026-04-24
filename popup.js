@@ -126,7 +126,6 @@ class SecureAuthenticatorUI {
     });
 
     setTimeout(() => document.getElementById('setup-pin')?.focus(), 100);
-    this.initSettings();
   }
 
   async initSettings() {
@@ -138,10 +137,50 @@ class SecureAuthenticatorUI {
       if (settings.vault_lock_timeout !== undefined) {
         lockSelect.value = settings.vault_lock_timeout;
       }
-      lockSelect.addEventListener('change', (e) => {
-        chrome.storage.local.set({ vault_lock_timeout: parseInt(e.target.value) });
-        this.showMessage('Lock timeout updated', 'success');
-      });
+      const lockTimeout = document.getElementById('lock-timeout');
+      if (lockTimeout) {
+        lockTimeout.addEventListener('change', (e) => {
+          chrome.storage.local.set({ vault_lock_timeout: parseInt(e.target.value) });
+          this.showMessage('Lock timeout updated', 'success');
+        });
+      }
+
+      // Sync Time Button
+      const syncBtn = document.getElementById('sync-time-btn');
+      if (syncBtn) {
+        syncBtn.addEventListener('click', async () => {
+          const status = document.getElementById('sync-status');
+          const originalText = syncBtn.innerHTML;
+          
+          syncBtn.disabled = true;
+          syncBtn.innerHTML = '<span>⏳</span> Syncing...';
+          if (status) status.textContent = '';
+          
+          const response = await this.sendMessage({ type: 'SYNC_TIME' });
+          
+          syncBtn.disabled = false;
+          syncBtn.innerHTML = originalText;
+          
+          if (response.success) {
+            const offsetSec = Math.round(response.offset / 1000);
+            if (status) {
+              status.textContent = `Success! Drift: ${offsetSec}s`;
+              status.style.color = '#4CAF50';
+            }
+            this.sounds.playSuccess();
+            
+            // Force update local offset and codes
+            await this.initTimeOffset();
+            await this.updateTOTPCodes();
+          } else {
+            if (status) {
+              status.textContent = 'Failed: ' + response.error;
+              status.style.color = '#f44336';
+            }
+            this.sounds.playError();
+          }
+        });
+      }
     }
     
     // Set theme select
@@ -154,6 +193,17 @@ class SecureAuthenticatorUI {
       themeSelect.addEventListener('change', (e) => {
         chrome.storage.local.set({ vault_theme: e.target.value });
         this.applyTheme(e.target.value);
+      });
+    }
+
+    // Account type listener
+    const accountTypeSelect = document.getElementById('account-type');
+    if (accountTypeSelect) {
+      accountTypeSelect.addEventListener('change', (e) => {
+        const counterGroup = document.getElementById('counter-group');
+        if (counterGroup) {
+          counterGroup.style.display = e.target.value === 'HOTP' ? 'block' : 'none';
+        }
       });
     }
 
@@ -279,6 +329,17 @@ class SecureAuthenticatorUI {
     setTimeout(() => document.getElementById('unlock-pin').focus(), 100);
   }
 
+  async initTimeOffset() {
+    try {
+      const data = await chrome.storage.local.get('vault_time_offset');
+      if (data.vault_time_offset !== undefined) {
+        this.totp.setTimeOffset(data.vault_time_offset);
+      }
+    } catch (error) {
+      console.error('Error initializing time offset:', error);
+    }
+  }
+
   /** Show error text inside a vault view error element */
   showVaultError(el, msg) {
     el.textContent    = msg;
@@ -295,6 +356,7 @@ class SecureAuthenticatorUI {
     this.applyEnvironmentFlags();
     await this.loadAccounts();
     this.setupEventListeners();
+    this.initTimeOffset();
     await this.renderAccounts();
     this.startTOTPUpdates();
     this.setupInactivityLock();
@@ -464,8 +526,15 @@ class SecureAuthenticatorUI {
     div.dataset.accountId = account.id;
 
     try {
-      const code = await this.totp.generate(account.secret, account.period || 30, account.digits || 6);
-      const remainingTime = this.totp.getRemainingTime(account.period || 30);
+      const isHOTP = account.type === 'HOTP';
+      let code;
+      if (isHOTP) {
+        code = await this.totp.generateHOTP(account.secret, account.counter || 0, account.digits || 6);
+      } else {
+        code = await this.totp.generate(account.secret, account.period || 30, account.digits || 6);
+      }
+      
+      const remainingTime = isHOTP ? 0 : this.totp.getRemainingTime(account.period || 30);
 
       const iconUrl = this.getServiceIcon(account.issuer, account.name);
 
@@ -475,24 +544,44 @@ class SecureAuthenticatorUI {
             <img src="${iconUrl}" width="24" height="24" alt="" onerror="this.style.display='none'">
           </div>
           <div class="account-info">
-            <h3>${this.escapeHtml(account.name)}</h3>
-            <p>${this.escapeHtml(account.issuer || account.name)}</p>
+            <div class="account-name">${this.escapeHtml(account.name)}</div>
+            <div class="account-issuer">${this.escapeHtml(account.issuer || '')}</div>
           </div>
           <div class="account-actions">
-            <button class="icon-btn edit-btn" title="Edit">Edit</button>
-            <button class="icon-btn delete-btn" title="Delete">Delete</button>
+            <button class="autofill-btn icon-btn" data-account-id="${account.id}" data-code="${code}" title="Autofill in page">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+            </button>
+            <button class="copy-btn btn-sm" data-account-id="${account.id}" data-code="${code}">Copy</button>
+            ${isHOTP ? `
+            <button class="refresh-btn icon-btn" data-account-id="${account.id}" title="Increment counter">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+            </button>` : ''}
+            <div class="more-menu">
+              <button class="menu-dots">⋮</button>
+              <div class="more-dropdown">
+                <button class="edit-btn">Edit</button>
+                <button class="delete-btn">Delete</button>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="totp-code">
+        <div class="account-body">
           <div class="code-display" data-account-id="${account.id}">${this.formatCode(code)}</div>
-          <button class="copy-btn" data-account-id="${account.id}" data-code="${code}">Copy</button>
         </div>
+        ${!isHOTP ? `
         <div class="progress-container">
           <div class="progress-bar">
             <div class="progress-fill" data-account-id="${account.id}" style="width: ${(remainingTime / (account.period || 30)) * 100}%"></div>
           </div>
-          <span class="timer-seconds" data-account-id="${account.id}">${remainingTime}</span>
-        </div>
+          <div class="timer-seconds" data-account-id="${account.id}">${remainingTime}s</div>
+        </div>` : `
+        <div class="counter-container">
+          <div class="counter-label">Counter: ${account.counter || 0}</div>
+        </div>`}
       `;
 
       this.lastCodeWindowByAccount[account.id] = Math.floor(Date.now() / 1000 / (account.period || 30));
@@ -500,6 +589,15 @@ class SecureAuthenticatorUI {
         const currentCode = e.currentTarget.getAttribute('data-code') || code;
         this.copyCode(account.id, currentCode);
       });
+      div.querySelector('.autofill-btn').addEventListener('click', (e) => {
+        const currentCode = e.currentTarget.getAttribute('data-code') || code;
+        this.autofillCode(currentCode);
+      });
+      
+      if (isHOTP) {
+        div.querySelector('.refresh-btn').addEventListener('click', () => this.incrementCounter(account));
+      }
+
       div.querySelector('.edit-btn').addEventListener('click', () => this.editAccount(account));
       div.querySelector('.delete-btn').addEventListener('click', () => this.deleteAccount(account.id));
 
@@ -524,6 +622,92 @@ class SecureAuthenticatorUI {
   formatCode(code) {
     // Format code with spaces for better readability
     return code.replace(/(.{3})/g, '$1 ').trim();
+  }
+
+  async incrementCounter(account) {
+    try {
+      account.counter = (account.counter || 0) + 1;
+      const response = await this.sendMessage({
+        type: 'UPDATE_ACCOUNT',
+        account: account
+      });
+
+      if (response.success) {
+        await this.loadAccounts();
+        await this.renderAccounts();
+        this.sounds.playSuccess();
+      } else {
+        throw new Error(response.error);
+      }
+    } catch (error) {
+      console.error('Error incrementing counter:', error);
+      this.showError(this.i18n.t('messages.counter_increment_failed'));
+    }
+  }
+
+  async autofillCode(code) {
+    const cleanCode = code.replace(/\s/g, '');
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab) return;
+
+      // Ensure we don't try to inject into restricted pages
+      if (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://')) {
+        this.showError('Cannot autofill on system pages');
+        return;
+      }
+
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: (codeToFill) => {
+          const selectors = [
+            'input[autocomplete="one-time-code"]',
+            'input[name*="otp"]',
+            'input[name*="2fa"]',
+            'input[name*="code"]',
+            'input[id*="otp"]',
+            'input[id*="2fa"]',
+            'input[id*="code"]',
+            'input[type="text"][maxlength="6"]',
+            'input[type="tel"][maxlength="6"]'
+          ];
+          
+          let target = document.activeElement;
+          if (!target || target.tagName !== 'INPUT' || (target.type !== 'text' && target.type !== 'tel' && target.type !== 'password')) {
+             for (const selector of selectors) {
+               const el = document.querySelector(selector);
+               if (el) {
+                 target = el;
+                 break;
+               }
+             }
+          }
+
+          if (target && target.tagName === 'INPUT') {
+            target.focus();
+            target.value = codeToFill;
+            target.dispatchEvent(new Event('input', { bubbles: true }));
+            target.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          }
+          return false;
+        },
+        args: [cleanCode]
+      }).then(results => {
+        if (results && results[0] && results[0].result) {
+          this.sounds.playSuccess();
+          // Optional: window.close() if not in full tab
+          if (!window.matchMedia('(min-width: 401px)').matches) {
+            window.close();
+          }
+        } else {
+          this.showError('No input field found. Click on the code box first.');
+        }
+      });
+    } catch (err) {
+      console.error('Autofill error:', err);
+      this.showError('Autofill error: ' + err.message);
+    }
   }
 
   copyCode(accountId, code) {
@@ -650,7 +834,9 @@ class SecureAuthenticatorUI {
       name: formData.get('name') || document.getElementById('account-name').value,
       issuer: document.getElementById('account-issuer').value,
       secret: document.getElementById('account-secret').value.toUpperCase().replace(/\s/g, ''),
-      digits: parseInt(document.getElementById('account-digits').value)
+      digits: parseInt(document.getElementById('account-digits').value),
+      type: document.getElementById('account-type').value,
+      counter: parseInt(document.getElementById('account-counter').value) || 0
     };
 
     try {
@@ -704,7 +890,14 @@ class SecureAuthenticatorUI {
     document.getElementById('account-issuer').value = account.issuer || '';
     document.getElementById('account-secret').value = account.secret;
     document.getElementById('account-digits').value = account.digits || 6;
+    document.getElementById('account-type').value = account.type || 'TOTP';
+    document.getElementById('account-counter').value = account.counter || 0;
     
+    const counterGroup = document.getElementById('counter-group');
+    if (counterGroup) {
+      counterGroup.style.display = (account.type === 'HOTP') ? 'block' : 'none';
+    }
+
     this.showAddAccountModal();
   }
 

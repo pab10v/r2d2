@@ -175,6 +175,19 @@
                             <input type="text" id="account-secret" required placeholder="Base32 secret">
                             <small>Enter the secret key from your 2FA setup</small>
                         </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="account-type" data-i18n="ui.account_type">Type</label>
+                                <select id="account-type">
+                                    <option value="TOTP" data-i18n="ui.totp">Time-based (TOTP)</option>
+                                    <option value="HOTP" data-i18n="ui.hotp">Counter-based (HOTP)</option>
+                                </select>
+                            </div>
+                            <div id="counter-group" class="form-group" style="display: none;">
+                                <label for="account-counter" data-i18n="ui.counter">Initial Counter</label>
+                                <input type="number" id="account-counter" value="0" min="0">
+                            </div>
+                        </div>
                         <div class="form-group">
                             <label for="account-digits" data-i18n="ui.digits">Digits</label>
                             <select id="account-digits">
@@ -292,6 +305,12 @@
                                 <option value="0">Never</option>
                             </select>
                         </div>
+                        <div style="margin-top: 15px;">
+                            <button id="sync-time-btn" class="btn btn-secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <span>🕒</span> Sync Time with Google
+                            </button>
+                            <small id="sync-status" style="display: block; margin-top: 4px; font-size: 10px; color: #666;"></small>
+                        </div>
                     </div>
                     <div class="form-group" style="margin-top: 15px;">
                         <h3>Preferences</h3>
@@ -399,6 +418,8 @@
     </div> <!-- #view-main -->
 
     <!-- Scripts -->
+    <!-- Argon2 Sandbox -->
+    <iframe id="argon-sandbox" src="sandbox.html" style="display: none;"></iframe>
     <script src="i18n.js"></script>
     <script src="r2d2-sounds.js"></script>
     <script src="totp.js"></script>

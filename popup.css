@@ -132,11 +132,36 @@ body {
     background: #e9ecef;
 }
 
-.header .btn-secondary {
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+.btn-icon {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    transition: all 0.2s ease;
 }
+
+.btn-icon:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #4CAF50;
+}
+
+.theme-dark .btn-icon {
+    color: #aaa;
+}
+
+.theme-dark .btn-icon:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.autofill-btn {
+    margin-right: 4px;
+}
+
 
 .header .btn-secondary:hover {
     background: rgba(255, 255, 255, 0.3);
@@ -251,6 +276,32 @@ body {
 
 .icon-btn:hover {
     background: #f0f0f0;
+}
+
+.counter-container {
+    font-size: 12px;
+    color: #888;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.refresh-btn svg {
+    transition: transform 0.3s ease;
+}
+
+.refresh-btn:active svg {
+    transform: rotate(180deg);
+}
+
+.form-row {
+    display: flex;
+    gap: 12px;
+}
+
+.form-row .form-group {
+    flex: 1;
 }
 
 /* TOTP Code Display */

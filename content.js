@@ -141,8 +141,6 @@ class SecureAuthenticatorContent {
     // Create wrapper div
     const wrapper = document.createElement('div');
     wrapper.className = 'secure-auth-wrapper';
-    wrapper.style.position = 'relative';
-    wrapper.style.display = 'inline-block';
 
     // Get computed styles
     const computedStyle = window.getComputedStyle(input);
@@ -159,34 +157,6 @@ class SecureAuthenticatorContent {
     button.innerHTML = this.buttonSVG;
     button.title = 'Fill 2FA code';
     button.setAttribute('aria-label', 'Fill 2FA code');
-    
-    // Style the button
-    button.style.cssText = `
-      position: absolute;
-      right: 8px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 4px;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      z-index: 1000;
-    `;
-
-    // Add hover effect
-    button.addEventListener('mouseenter', () => {
-      button.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
-    });
-
-    button.addEventListener('mouseleave', () => {
-      button.style.backgroundColor = 'transparent';
-    });
 
     // Add click handler
     button.addEventListener('click', (e) => {
@@ -232,7 +202,9 @@ class SecureAuthenticatorContent {
         domain: domain
       });
 
-      if (response.success && response.accounts.length > 0) {
+      if (response.locked) {
+        this.showError('R2D2 is locked. Open the extension popup to unlock.');
+      } else if (response.success && response.accounts.length > 0) {
         this.createCodePicker(input, button, response.accounts, response.bound, domain);
       } else {
         this.showError('No 2FA accounts found for this site');
@@ -249,43 +221,17 @@ class SecureAuthenticatorContent {
   createCodePicker(input, button, accounts, isBound, domain) {
     const picker = document.createElement('div');
     picker.className = 'secure-auth-picker';
-    
-    // Style the picker
-    picker.style.cssText = `
-      position: absolute;
-      top: 100%;
-      right: 0;
-      background: white;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 10000;
-      min-width: 280px;
-      max-height: 300px;
-      overflow-y: auto;
-    `;
 
     // Create header
     const header = document.createElement('div');
-    header.style.cssText = `
-      padding: 12px 16px;
-      border-bottom: 1px solid #eee;
-      font-weight: 600;
-      font-size: 14px;
-      color: #333;
-    `;
+    header.className = 'secure-auth-picker-header';
     header.textContent = isBound ? 'Bound Account' : `Accounts for ${domain}`;
     picker.appendChild(header);
 
     // Create account list
     accounts.forEach(account => {
       const accountItem = document.createElement('div');
-      accountItem.style.cssText = `
-        padding: 12px 16px;
-        border-bottom: 1px solid #f0f0f0;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-      `;
+      accountItem.className = 'secure-auth-picker-item';
 
       accountItem.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -302,15 +248,6 @@ class SecureAuthenticatorContent {
           </div>
         </div>
       `;
-
-      // Add hover effect
-      accountItem.addEventListener('mouseenter', () => {
-        accountItem.style.backgroundColor = '#f8f9fa';
-      });
-
-      accountItem.addEventListener('mouseleave', () => {
-        accountItem.style.backgroundColor = 'transparent';
-      });
 
       // Add click handler
       accountItem.addEventListener('click', () => {
@@ -446,7 +383,17 @@ class SecureAuthenticatorContent {
       let shouldProcess = false;
       
       mutations.forEach((mutation) => {
-        if (mutation.addedNodes.length > 0) {
+        if (mutation.addedNodes.length === 0) {
+          return;
+        }
+
+        const hasNewInputs = Array.from(mutation.addedNodes).some((node) => {
+          if (node.nodeType !== Node.ELEMENT_NODE) return false;
+          if (node.tagName === 'INPUT') return true;
+          return typeof node.querySelector === 'function' && !!node.querySelector('input');
+        });
+
+        if (hasNewInputs) {
           shouldProcess = true;
         }
       });
@@ -478,8 +425,16 @@ class SecureAuthenticatorContent {
    * Send message to background script
    */
   sendMessage(message) {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage(message, resolve);
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          return reject(new Error(chrome.runtime.lastError.message));
+        }
+        if (response === undefined) {
+          return reject(new Error('No response from background service worker'));
+        }
+        resolve(response);
+      });
     });
   }
 }

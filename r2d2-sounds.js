@@ -243,7 +243,6 @@ class R2D2Sounds {
 
     sounds.forEach(sound => {
       setTimeout(() => {
-        console.log(`Playing ${sound.name} sound`);
         sound.fn();
       }, sound.delay);
     });

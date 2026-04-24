@@ -1,135 +1,411 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="extension.name">Secure Authenticator</title>
     <link rel="stylesheet" href="popup.css">
-    <style>
-        body {
-            width: 380px;
-            height: auto;
-        }
-    </style>
 </head>
+
 <body>
-    <div id="app">
-        <!-- Header -->
-        <header class="header">
-            <h1 data-i18n="extension.name">Secure Authenticator</h1>
-            <div class="header-actions">
-                <button id="add-account-btn" class="btn btn-primary" data-i18n="ui.add_account">+ Add Account</button>
-                <button id="menu-btn" class="btn btn-secondary">...</button>
+    <header class="header">
+        <div style="display: flex; align-items: center;">
+            <div class="logo-icon" style="margin-right: 10px; width: 32px; height: 32px;">
+                <svg id="ePClGFr0fau1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+                    viewBox="0 0 48 48" shape-rendering="geometricPrecision" text-rendering="geometricPrecision"
+                    project-id="ca3d33f99fc24ca9b534fad73a9a01ad" export-id="323c31f20dab4340bcfbc4c43c2081da"
+                    cached="false">
+                    <g transform="matrix(1.7 0 0 1.7 -16.799898 -16.79958)">
+                        <path
+                            d="M15.2725,18.763c0-4.8199,3.9072-8.7269,8.7272-8.7269s8.7273,3.907,8.7273,8.7269v13.963h-17.4545v-13.963Z"
+                            fill="#a4dddd" />
+                        <path
+                            d="M22.2547,34.0352l-1.2,2.7c-.12.2701-.0952.5821.0659.83s.4363.397.7317.397h4.296c.2955,0,.5708-.1492.7318-.397s.1859-.5599.0659-.83l-1.2004-2.7h-3.4909Z"
+                            fill="#cdeffb" stroke="#bab7fa" stroke-width="0.3" />
+                        <path d="M32.7271,20.5088h.8727c1.4461,0,2.6182,1.172,2.6182,2.618v9.5996h-3.4909v-12.2176Z"
+                            fill="#a6bfc5" />
+                        <path
+                            d="M32.7273,32.7266l-1.3627,4.0876c-.0886.2662-.0441.5585.12.7863.164.2278.4276.3622.7082.3622h4.56c.2806,0,.5441-.1349.7078-.3626s.2085-.5201.12-.7863l-1.3624-4.0872h-3.4909Z"
+                            fill="#d9fbfb" stroke="#bab7fa" stroke-width="0.1" />
+                        <path d="M15.2726,20.5088h-.8727c-1.4461,0-2.6182,1.172-2.6182,2.618v9.5996h3.4909v-12.2176Z"
+                            fill="#cfd3d4" />
+                        <path
+                            d="M15.2725,32.7266l1.3627,4.0876c.0886.2662.0441.5585-.12.7863-.164.2273-.4276.3622-.7082.3622h-4.56c-.2806,0-.5441-.1349-.7078-.3626-.164-.2278-.2085-.5201-.12-.7863l1.3624-4.0872h3.4909Z"
+                            fill="#cedbe4" stroke="#c1bfdc" stroke-width="0.3" />
+                        <path d="M29.2362,34.9083h-10.4727l-1.7454-2.1817h13.9636l-1.7455,2.1817Z" fill="#9fc3cc" />
+                        <path d="M13.9632,34.0352h-.8724v3.0544h.8724v-3.0544Z" transform="translate(0 -0.106658)"
+                            fill="#89adb6" />
+                        <path d="M34.9085,34.0352h-.8724v3.0544h.8724v-3.0544Z" fill="#4e8491" />
+                        <path d="M24.436,34.9072h-.8725v2.1822h.8725v-2.1822Z" transform="translate(0 -0.106458)"
+                            fill="#4e8491" />
+                        <path d="M23.9997,10.0361c-4.82,0-8.7272,3.907-8.7272,8.7269v13.963h8.7272v-22.6899Z"
+                            fill="#e2eef3" />
+                        <path d="M29.2361,26.6172h-2.6179v4.363h2.6179v-4.363Z" fill="#fff" />
+                        <path d="M27.0544,16.5813h-6.1091l.4364-5.2361h5.2363l.4364,5.2361Z" fill="#059bbf" />
+                        <path
+                            d="M23.9999,15.4904c.8435,0,1.5273-.6837,1.5273-1.5272s-.6838-1.5272-1.5273-1.5272-1.5272.6838-1.5272,1.5272.6837,1.5272,1.5272,1.5272Z"
+                            fill="#3e3e3f" />
+                        <path
+                            d="M23.9996,15.9267c-1.0825,0-1.9635-.8809-1.9635-1.9634s.881-1.9633,1.9635-1.9633s1.9634.8809,1.9634,1.9633-.8809,1.9634-1.9634,1.9634Zm0-3.4904c-.8421,0-1.5271.685-1.5271,1.527s.685,1.5271,1.5271,1.5271s1.5271-.685,1.5271-1.5271-.685-1.527-1.5271-1.527Z"
+                            fill="#40c9e7" />
+                        <path
+                            d="M29.2364,18.6543c.6629,0,1.2002-.5374,1.2002-1.2002s-.5373-1.2002-1.2002-1.2002-1.2003.5373-1.2003,1.2002.5374,1.2002,1.2003,1.2002Z"
+                            fill="#6cb0dc" />
+                        <path d="M25.745,26.6172h-3.4906v4.363h3.4906v-4.363Z" fill="rgba(70,5,88,0.87)" />
+                        <path d="M32.727,19.6353h-17.4545v.8726h17.4545v-.8726Z" fill="#a6bfc5" />
+                        <path d="M29.2362,22.2539h-10.9091v.8727h10.9091v-.8727Z" fill="#059bbf" />
+                        <path d="M29.2362,24.4355h-10.9091v.8727h10.9091v-.8727Z" fill="#059bbf" />
+                        <path d="M20.9453,26.6172h-2.6182v1.309h2.6182v-1.309Z" fill="#a6bfc5" />
+                        <path d="M23.1276,17.4541h-2.1823v1.3093h2.1823v-1.3093Z" fill="#059bbf" />
+                        <path d="M19.6361,17.4541h-3.0546v1.309h3.0546v-1.309Z" fill="#059bbf" />
+                        <path d="M27.0545,17.4541h-3.0545v1.309h3.0545v-1.309Z" fill="#059bbf" />
+                        <path d="M20.9453,28.7988h-2.6182v2.1817h2.6182v-2.1817Z" fill="#a6bfc5" />
+                        <path d="M28.3631,27.4902h-.8724v2.6181h.8724v-2.6181Z" fill="#a6bfc5" />
+                        <path d="M23.9999,32.7266h-6.9818l1.7454,2.1817h5.2364v-2.1817Z" fill="#b8e6e6" />
+                        <path
+                            d="M22.4727,13.9632c0,.8435.6837,1.5272,1.5272,1.5272v-3.0544c-.8435,0-1.5272.6838-1.5272,1.5272Z"
+                            fill="#5b5c5f" />
+                    </g>
+                </svg>
             </div>
-        </header>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Account List -->
-            <div id="account-list" class="account-list">
-                <!-- Accounts will be dynamically added here -->
-            </div>
-
-            <!-- Empty State -->
-            <div id="empty-state" class="empty-state" style="display: none;">
-                <div class="empty-icon">...</div>
-                <h2 data-i18n="ui.no_accounts">No Accounts Yet</h2>
-                <p>Add your first 2FA account to get started</p>
-                <button id="add-first-account-btn" class="btn btn-primary" data-i18n="ui.add_first">Add Your First Account</button>
-            </div>
-        </main>
-
-        <!-- Add Account Modal -->
-        <div id="add-account-modal" class="modal" style="display: none;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 data-i18n="ui.add_account">Add New Account</h2>
-                    <button id="close-modal-btn" class="close-btn">&times;</button>
-                </div>
-                <form id="add-account-form">
-                    <div class="form-group">
-                        <label for="account-name" data-i18n="ui.account_name">Account Name</label>
-                        <input type="text" id="account-name" required placeholder="e.g., Gmail">
-                    </div>
-                    <div class="form-group">
-                        <label for="account-issuer" data-i18n="ui.issuer">Issuer (Optional)</label>
-                        <input type="text" id="account-issuer" placeholder="e.g., Google">
-                    </div>
-                    <div class="form-group">
-                        <label for="account-secret" data-i18n="ui.secret_key">Secret Key</label>
-                        <input type="text" id="account-secret" required placeholder="Base32 secret">
-                        <small>Enter the secret key from your 2FA setup</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="account-digits" data-i18n="ui.digits">Digits</label>
-                        <select id="account-digits">
-                            <option value="6">6 digits</option>
-                            <option value="8">8 digits</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="scan-qr-btn">Or Scan QR Code</label>
-                        <button type="button" id="scan-qr-btn" class="btn btn-secondary">Scan QR Code</button>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" id="cancel-add-btn" class="btn btn-secondary" data-i18n="ui.cancel">Cancel</button>
-                        <button type="submit" class="btn btn-primary" data-i18n="ui.add_account">Add Account</button>
-                    </div>
-                </form>
-            </div>
+            <h1 data-i18n="extension.name">R2D2 Authenticator</h1>
         </div>
-
-        <!-- Menu Dropdown -->
-        <div id="menu-dropdown" class="dropdown" style="display: none;">
-            <button id="export-btn" class="dropdown-item" data-i18n="ui.export">Export Accounts</button>
-            <button id="import-btn" class="dropdown-item" data-i18n="ui.import">Import Accounts</button>
-            <button id="sounds-toggle-btn" class="dropdown-item">R2D2 Sounds: ON</button>
-            <button id="test-sounds-btn" class="dropdown-item">Test R2D2 Sounds</button>
-            <button id="settings-btn" class="dropdown-item" data-i18n="ui.settings">Settings</button>
+        <div class="header-actions">
+            <button id="add-account-btn" class="btn btn-primary btn-sm" data-i18n="ui.add_account"
+                style="display: none;">+ Add Account</button>
+            <button id="close-tab-btn" class="btn btn-secondary btn-sm" style="display: none; padding: 5px 10px;">Close
+                Tab</button>
+            <button id="menu-btn" class="menu-btn" style="display: none;">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
         </div>
+    </header>
 
-        <!-- Import Modal -->
-        <div id="import-modal" class="modal" style="display: none;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 data-i18n="ui.restore_accounts">Import Accounts</h2>
-                    <button id="close-import-modal-btn" class="close-btn">&times;</button>
+    <!-- ═══════════════════════════════════════════════════════════
+       VIEW: SETUP — First use, create PIN
+  ═══════════════════════════════════════════════════════════ -->
+    <div id="view-setup" class="vault-view" style="display:none;">
+        <div class="vault-card">
+            <div class="vault-icon">🔐</div>
+            <h1 class="vault-title">Welcome to R2D2</h1>
+            <p class="vault-subtitle">Create a PIN to protect your 2FA secrets</p>
+            <form id="setup-form" autocomplete="off">
+                <div class="pin-group">
+                    <label for="setup-pin">Choose a PIN</label>
+                    <input id="setup-pin" type="password" inputmode="numeric" maxlength="8" placeholder="4–8 digits"
+                        autocomplete="new-password" required>
                 </div>
-                <div class="form-group">
-                    <label for="import-data">Paste Export Data</label>
-                    <textarea id="import-data" rows="10" placeholder="Paste JSON or otpauth:// export data here..."></textarea>
+                <div class="pin-group">
+                    <label for="setup-pin-confirm">Confirm PIN</label>
+                    <input id="setup-pin-confirm" type="password" inputmode="numeric" maxlength="8"
+                        placeholder="Repeat PIN" autocomplete="new-password" required>
                 </div>
-                <div class="form-actions">
-                    <button type="button" id="cancel-import-btn" class="btn btn-secondary" data-i18n="ui.cancel">Cancel</button>
-                    <button type="button" id="confirm-import-btn" class="btn btn-primary" data-i18n="ui.import">Import</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Export Modal -->
-        <div id="export-modal" class="modal" style="display: none;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 data-i18n="ui.backup_accounts">Export Accounts</h2>
-                    <button id="close-export-modal-btn" class="close-btn">&times;</button>
-                </div>
-                <div class="form-group">
-                    <label for="export-data">Export Data</label>
-                    <textarea id="export-data" rows="10" readonly></textarea>
-                    <small>Save this data securely for backup purposes</small>
-                </div>
-                <div class="form-actions">
-                    <button id="copy-export-btn" class="btn btn-secondary" data-i18n="ui.copy">Copy to Clipboard</button>
-                    <button id="close-export-btn" class="btn btn-primary">Close</button>
-                </div>
-            </div>
+                <div id="setup-error" class="vault-error" style="display:none;"></div>
+                <button type="submit" class="vault-btn">Create Vault</button>
+            </form>
+            <p class="vault-note">Your PIN encrypts all secrets with AES-256-GCM.<br>There is no recovery — don't forget
+                it.</p>
         </div>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+       VIEW: UNLOCK — Enter PIN
+  ═══════════════════════════════════════════════════════════ -->
+    <div id="view-unlock" class="vault-view" style="display:none;">
+        <div class="vault-card">
+            <div class="vault-icon">🔒</div>
+            <h1 class="vault-title">R2D2 Locked</h1>
+            <p class="vault-subtitle">Enter your PIN to access your accounts</p>
+            <form id="unlock-form" autocomplete="off">
+                <div class="pin-group">
+                    <label for="unlock-pin">PIN</label>
+                    <input id="unlock-pin" type="password" inputmode="numeric" maxlength="8" placeholder="Enter PIN"
+                        autocomplete="current-password" required>
+                </div>
+                <div id="unlock-error" class="vault-error" style="display:none;"></div>
+                <button type="submit" id="unlock-btn" class="vault-btn">Unlock</button>
+            </form>
+            <p id="unlock-attempts" class="vault-note" style="display:none;"></p>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+       VIEW: MAIN — Authenticator
+  ═══════════════════════════════════════════════════════════ -->
+    <div id="view-main" style="display:none;">
+        <div id="app">
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Account List -->
+                <div id="account-list" class="account-list">
+                    <!-- Accounts will be dynamically added here -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="empty-state" class="empty-state" style="display: none;">
+                    <div class="empty-icon">...</div>
+                    <h2 data-i18n="ui.no_accounts">No Accounts Yet</h2>
+                    <p>Add your first 2FA account to get started</p>
+                    <button id="add-first-account-btn" class="btn btn-primary" data-i18n="ui.add_first">Add Your First
+                        Account</button>
+                </div>
+            </main>
+
+            <!-- Add Account Modal -->
+            <div id="add-account-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 data-i18n="ui.add_account">Add New Account</h2>
+                        <button id="close-modal-btn" class="close-btn">&times;</button>
+                    </div>
+                    <form id="add-account-form">
+                        <div class="form-group">
+                            <label for="account-name" data-i18n="ui.account_name">Account Name</label>
+                            <input type="text" id="account-name" required placeholder="e.g., Gmail">
+                        </div>
+                        <div class="form-group">
+                            <label for="account-issuer" data-i18n="ui.issuer">Issuer (Optional)</label>
+                            <input type="text" id="account-issuer" placeholder="e.g., Google">
+                        </div>
+                        <div class="form-group">
+                            <label for="account-secret" data-i18n="ui.secret_key">Secret Key</label>
+                            <input type="text" id="account-secret" required placeholder="Base32 secret">
+                            <small>Enter the secret key from your 2FA setup</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="account-digits" data-i18n="ui.digits">Digits</label>
+                            <select id="account-digits">
+                                <option value="6">6 digits</option>
+                                <option value="8">8 digits</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="scan-qr-btn">Or Scan QR Code</label>
+                            <button type="button" id="scan-qr-btn" class="btn btn-secondary">Scan QR Code</button>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="cancel-add-btn" class="btn btn-secondary"
+                                data-i18n="ui.cancel">Cancel</button>
+                            <button type="submit" class="btn btn-primary" data-i18n="ui.add_account">Add
+                                Account</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Menu Dropdown -->
+            <div id="menu-dropdown" class="dropdown" style="display: none;">
+                <button id="export-btn" class="dropdown-item" data-i18n="ui.export">Export Accounts</button>
+                <button id="import-btn" class="dropdown-item" data-i18n="ui.import">Import Accounts</button>
+                <button id="qr-scanner-btn" class="dropdown-item">Scan QR Code</button>
+                <button id="expand-tab-btn" class="dropdown-item">Expand to Tab</button>
+                <button id="sounds-toggle-btn" class="dropdown-item">R2D2 Sounds: ON</button>
+                <button id="test-sounds-btn" class="dropdown-item">Test R2D2 Sounds</button>
+                <button id="debug-btn" class="dropdown-item">Debug TOTP</button>
+                <button id="settings-btn" class="dropdown-item" data-i18n="ui.settings">Settings</button>
+            </div>
+
+            <!-- Import Modal -->
+            <div id="import-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 data-i18n="ui.restore_accounts">Import Accounts</h2>
+                        <button id="close-import-modal-btn" class="close-btn">&times;</button>
+                    </div>
+                    <div class="form-group">
+                        <label for="import-data">Paste Export Data</label>
+                        <textarea id="import-data" rows="10"
+                            placeholder="Paste JSON or otpauth:// export data here..."></textarea>
+                    </div>
+                    <div class="form-group" style="padding-top: 0;">
+                        <label for="import-file-input">Or Load from File</label>
+                        <input type="file" id="import-file-input" accept=".json,.txt" class="form-control">
+                    </div>
+                    <div class="form-group" id="import-password-group" style="margin-bottom: 15px;">
+                        <label for="import-password">Decryption Password (if encrypted)</label>
+                        <input type="password" id="import-password" placeholder="Enter password to decrypt data"
+                            class="form-control" style="width: 100%;">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="cancel-import-btn" class="btn btn-secondary"
+                            data-i18n="ui.cancel">Cancel</button>
+                        <button type="button" id="confirm-import-btn" class="btn btn-primary"
+                            data-i18n="ui.import">Import</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Modal -->
+            <div id="export-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 data-i18n="ui.backup_accounts">Export Accounts</h2>
+                        <button id="close-export-modal-btn" class="close-btn">&times;</button>
+                    </div>
+                    <div class="warning-banner"
+                        style="background: rgba(244,67,54,0.1); border: 1px solid #f44336; padding: 10px; border-radius: 6px; margin-bottom: 15px; display: flex; align-items: flex-start; gap: 10px;">
+                        <span style="font-size: 20px;">⚠️</span>
+                        <div style="font-size: 12px; color: #d32f2f;">
+                            <strong>Warning:</strong> This export contains your 2FA secrets. Never share this data or
+                            save it in insecure locations.
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="export-password">Encryption Password (Optional)</label>
+                        <input type="password" id="export-password" placeholder="Leave blank for plaintext"
+                            class="form-control" style="width: 100%;">
+                        <small>If set, the export will be encrypted with AES-256-GCM.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="export-data">Export Data</label>
+                        <textarea id="export-data" rows="8" readonly></textarea>
+                        <small>Save this data securely for backup purposes</small>
+                    </div>
+                    <div class="form-actions">
+                        <button id="copy-export-btn" class="btn btn-secondary" data-i18n="ui.copy">Copy to
+                            Clipboard</button>
+                        <button id="close-export-btn" class="btn btn-primary">Close</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Modal -->
+            <div id="settings-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 data-i18n="ui.settings">Settings</h2>
+                        <button id="close-settings-modal-btn" class="close-btn">&times;</button>
+                    </div>
+                    <div class="form-group" style="margin-top: 15px;">
+                        <h3>Security</h3>
+                        <button id="change-pin-btn" class="btn btn-secondary"
+                            style="margin-top: 10px; width: 100%;">Change PIN</button>
+                        <div style="margin-top: 10px;">
+                            <label for="lock-timeout">Auto-lock timeout</label>
+                            <select id="lock-timeout">
+                                <option value="1">1 minute</option>
+                                <option value="5" selected>5 minutes</option>
+                                <option value="15">15 minutes</option>
+                                <option value="0">Never</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 15px;">
+                        <h3>Preferences</h3>
+                        <div style="margin-top: 10px;">
+                            <label for="language-select">Language</label>
+                            <select id="language-select"></select>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <label for="theme-select">Theme</label>
+                            <select id="theme-select">
+                                <option value="auto">System Default</option>
+                                <option value="light">Light</option>
+                                <option value="dark">Dark</option>
+                            </select>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <label for="sort-order">Account Order</label>
+                            <select id="sort-order">
+                                <option value="manual">Manual (Date Added)</option>
+                                <option value="alpha">Alphabetical (A-Z)</option>
+                            </select>
+                        </div>
+                        <div
+                            style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+                            <label style="margin: 0;">R2D2 Sounds</label>
+                            <button id="settings-sounds-toggle-btn" class="btn btn-secondary btn-sm">ON</button>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 15px;">
+                        <h3>About</h3>
+                        <small>R2D2 Authenticator v1.5.0</small><br>
+                        <small id="settings-account-count">0 accounts</small>
+                    </div>
+                    <div class="form-actions">
+                        <button id="close-settings-btn" class="btn btn-primary">Close</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Change PIN Modal -->
+            <div id="change-pin-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Change PIN</h2>
+                        <button id="close-change-pin-modal-btn" class="close-btn">&times;</button>
+                    </div>
+                    <form id="change-pin-form" style="padding: 20px;">
+                        <div class="form-group" style="padding: 0; margin-bottom: 15px;">
+                            <label for="current-pin">Current PIN</label>
+                            <input type="password" id="current-pin" required maxlength="8"
+                                placeholder="Enter current PIN">
+                        </div>
+                        <div class="form-group" style="padding: 0; margin-bottom: 15px;">
+                            <label for="new-pin">New PIN</label>
+                            <input type="password" id="new-pin" required maxlength="8" placeholder="4-8 digits">
+                        </div>
+                        <div class="form-group" style="padding: 0; margin-bottom: 15px;">
+                            <label for="confirm-new-pin">Confirm New PIN</label>
+                            <input type="password" id="confirm-new-pin" required maxlength="8"
+                                placeholder="Repeat new PIN">
+                        </div>
+                        <div class="form-actions" style="padding: 10px 0 0 0; border: none;">
+                            <button type="button" id="cancel-change-pin-btn" class="btn btn-secondary">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Update PIN</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- QR Scanner Modal -->
+            <div id="qr-scanner-modal" class="modal" style="display: none;">
+                <div class="modal-content qr-scanner-content">
+                    <div class="modal-header">
+                        <h2 data-i18n="ui.scan_qr">Scan QR Code</h2>
+                        <button class="close-btn">&times;</button>
+                    </div>
+                    <div class="scanner-container">
+                        <video id="qr-video" width="300" height="300" style="display: none;"></video>
+                        <canvas id="qr-canvas" width="300" height="300" style="display: none;"></canvas>
+                        <div id="scanner-placeholder" class="scanner-placeholder">
+                            <div class="scanner-icon">QR</div>
+                            <p>Click "Start Camera" to begin scanning</p>
+                        </div>
+                        <div id="scanner-status" class="scanner-status"></div>
+                    </div>
+                    <div class="scanner-actions">
+                        <button id="start-camera-btn" class="btn btn-primary">Start Camera</button>
+                        <button id="stop-camera-btn" class="btn btn-secondary" style="display: none;">Stop
+                            Camera</button>
+                        <button id="scan-tab-btn" class="btn btn-secondary">Scan Tab</button>
+                        <button id="manual-input-btn" class="btn btn-secondary">Manual Input</button>
+                        <button id="close-scanner-btn" class="btn btn-primary">Close</button>
+                    </div>
+                    <div id="manual-input-section" class="manual-input-section" style="display: none;">
+                        <div class="form-group">
+                            <label for="manual-qr-input">Enter QR Code Data:</label>
+                            <textarea id="manual-qr-input" rows="4"
+                                placeholder="Paste otpauth:// URI or account data here..."></textarea>
+                        </div>
+                        <button id="import-manual-btn" class="btn btn-primary">Import</button>
+                    </div>
+                </div>
+            </div>
+        </div> <!-- #app -->
+    </div> <!-- #view-main -->
 
     <!-- Scripts -->
     <script src="i18n.js"></script>
     <script src="r2d2-sounds.js"></script>
     <script src="totp.js"></script>
+    <script src="vault.js"></script>
+    <script src="jsqr.js"></script>
+    <script src="qr-scanner.js"></script>
     <script src="popup.js"></script>
 </body>
+
 </html>

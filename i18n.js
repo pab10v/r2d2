@@ -9,8 +9,6 @@ class R2D2I18n {
     this.fallbackLocale = 'en';
     this.translations = new Map();
     this.loadedLocales = new Set();
-    
-    this.init();
   }
 
   async init() {

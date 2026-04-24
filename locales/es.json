@@ -19,7 +19,11 @@
     "no_accounts": "Sin Cuentas Aún",
     "add_first": "Agregar Tu Primera Cuenta",
     "backup_accounts": "Respaldar Cuentas",
-    "restore_accounts": "Restaurar Cuentas"
+    "restore_accounts": "Restaurar Cuentas",
+    "confirm": "Confirmar",
+    "delete_account_title": "Eliminar cuenta?",
+    "delete_account_confirm": "Estas seguro de que quieres eliminar esta cuenta? Esta accion no se puede deshacer.",
+    "export_format": "Formato de exportacion"
   },
   "messages": {
     "account_added": "Cuenta agregada exitosamente",
@@ -29,7 +33,19 @@
     "export_success": "Cuentas exportadas exitosamente",
     "import_success": "Cuentas importadas exitosamente",
     "no_2fa_accounts": "No se encontraron cuentas 2FA para este sitio",
-    "fill_2fa_code": "Llenar código 2FA"
+    "fill_2fa_code": "Llenar codigo 2FA",
+    "settings_coming_soon": "Configuracion proximamente",
+    "testing_sounds": "Probando sonidos de R2D2...",
+    "camera_access_denied": "Acceso a camara denegado. Usa entrada manual o permite el permiso de camara.",
+    "camera_initializing": "Inicializando camara...",
+    "camera_scanning": "Escaneando...",
+    "qr_detected_importing": "QR detectado. Importando...",
+    "qr_import_failed": "No se pudo importar el codigo QR",
+    "qr_start_failed": "No se pudo iniciar el escaner QR",
+    "camera_manual_fallback": "Camara no disponible. Ingresa manualmente los datos del QR.",
+    "qr_enter_data": "Ingresa datos del codigo QR",
+    "qr_invalid_data": "Datos de codigo QR invalidos",
+    "qr_unsupported_format": "Formato QR no soportado. Usa una URI otpauth://."
   },
   "security": {
     "offline_only": "Funciona completamente offline",

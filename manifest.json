@@ -6,8 +6,11 @@
   "default_locale": "en",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "scripting",
+    "alarms"
   ],
+  "optional_permissions": [],
   "host_permissions": [
     "<all_urls>"
   ],
@@ -30,6 +33,9 @@
     "16": "icons/icon.svg",
     "48": "icons/icon.svg",
     "128": "icons/icon.svg"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none';"
   },
   "web_accessible_resources": [
     {

@@ -4,22 +4,56 @@
  */
 
 importScripts('totp.js');
+importScripts('vault.js');
 
 class SecureAuthenticator {
   constructor() {
-    this.totp = new self.SecureTOTP();
-    this.storageKey = 'secure_authenticator_accounts';
+    this.totp  = new self.SecureTOTP(false);
+    this.vault = new self.SecureVault();
     this.domainBindingKey = 'secure_authenticator_domain_bindings';
-    
+
     // Initialize event listeners
     this.initEventListeners();
+    this.setupAutoLock();
+  }
+
+  setupAutoLock() {
+    chrome.alarms.create('autoLockCheck', { periodInMinutes: 1 });
+    chrome.alarms.onAlarm.addListener((alarm) => {
+      if (alarm.name === 'autoLockCheck') {
+        this.checkAutoLock();
+      }
+    });
+  }
+
+  async updateLastInteraction() {
+    await chrome.storage.session.set({ lastInteraction: Date.now() });
+  }
+
+  async checkAutoLock() {
+    if (this.vault.isLocked()) return;
+    
+    const [settings, session] = await Promise.all([
+      chrome.storage.local.get('vault_lock_timeout'),
+      chrome.storage.session.get('lastInteraction')
+    ]);
+    
+    const timeoutMin = settings.vault_lock_timeout !== undefined ? settings.vault_lock_timeout : 5;
+    if (timeoutMin === 0) return; // Never lock
+    
+    const lastInteraction = session.lastInteraction || 0;
+    const now = Date.now();
+    
+    if (now - lastInteraction > timeoutMin * 60 * 1000) {
+      this.vault.lock();
+      chrome.runtime.sendMessage({ type: 'VAULT_LOCKED' });
+    }
   }
 
   initEventListeners() {
     // Extension installation
     chrome.runtime.onInstalled.addListener((details) => {
       if (details.reason === 'install') {
-        console.log('Secure Authenticator installed');
         this.showWelcomePage();
       }
     });
@@ -35,57 +69,166 @@ class SecureAuthenticator {
    * Handle incoming messages
    */
   async handleMessage(message, sender, sendResponse) {
+    await this.updateLastInteraction();
     try {
+      // ── Vault management (no auth required) ──────────────────────────────
       switch (message.type) {
-        case 'GET_ACCOUNTS':
+        case 'VAULT_STATUS': {
+          const exists = await this.vault.hasVault();
+          const locked = this.vault.isLocked();
+          sendResponse({ success: true, exists, locked });
+          return;
+        }
+
+        case 'SETUP_VAULT': {
+          await this.vault.setup(message.pin);
+          sendResponse({ success: true });
+          return;
+        }
+
+        case 'UNLOCK_VAULT': {
+          const ok = await this.vault.unlock(message.pin);
+          sendResponse({ success: true, unlocked: ok });
+          return;
+        }
+
+        case 'LOCK_VAULT': {
+          this.vault.lock();
+          sendResponse({ success: true });
+          return;
+        }
+
+        case 'CHANGE_PIN': {
+          try {
+            await this.vault.changePin(message.data.oldPin, message.data.newPin);
+            sendResponse({ success: true });
+          } catch (error) {
+            sendResponse({ success: false, error: error.message });
+          }
+          return;
+        }
+      }
+
+      // ── Vault-protected operations ────────────────────────────────────────
+      if (this.vault.isLocked()) {
+        sendResponse({ success: false, locked: true, error: 'Vault is locked' });
+        return;
+      }
+
+      switch (message.type) {
+        case 'GET_ACCOUNTS': {
           const accounts = await this.getAccounts();
           sendResponse({ success: true, accounts });
           break;
+        }
 
-        case 'ADD_ACCOUNT':
+        case 'ADD_ACCOUNT': {
           const addedAccount = await this.addAccount(message.account);
           sendResponse({ success: true, account: addedAccount });
           break;
+        }
 
-        case 'UPDATE_ACCOUNT':
+        case 'UPDATE_ACCOUNT': {
           const updatedAccount = await this.updateAccount(message.account);
           sendResponse({ success: true, account: updatedAccount });
           break;
+        }
 
-        case 'DELETE_ACCOUNT':
+        case 'DELETE_ACCOUNT': {
           await this.deleteAccount(message.accountId);
           sendResponse({ success: true });
           break;
+        }
 
-        case 'GENERATE_TOTP':
-          const code = this.generateTOTP(message.secret, message.digits);
+        case 'GENERATE_TOTP': {
+          const code = await this.generateTOTP(message.secret, message.digits);
           sendResponse({ success: true, code });
           break;
+        }
 
-        case 'GET_TOTP_CODES_FOR_DOMAIN':
+        case 'GET_TOTP_CODES_FOR_DOMAIN': {
           const codes = await this.getTOTPCodesForDomain(message.domain);
           sendResponse({ success: true, ...codes });
           break;
+        }
 
-        case 'SAVE_DOMAIN_BINDING':
+        case 'SAVE_DOMAIN_BINDING': {
           await this.saveDomainBinding(message.domain, message.accountId);
           sendResponse({ success: true });
           break;
+        }
 
-        case 'EXPORT_ACCOUNTS':
+        case 'EXPORT_ACCOUNTS': {
           const exportData = await this.exportAccounts();
           sendResponse({ success: true, data: exportData });
           break;
+        }
 
-        case 'IMPORT_ACCOUNTS':
+        case 'IMPORT_ACCOUNTS': {
           await this.importAccounts(message.data);
           sendResponse({ success: true });
           break;
+        }
 
-        case 'IMPORT_FROM_OTPAUTH':
+        case 'IMPORT_FROM_OTPAUTH': {
           const result = await this.importFromOtpauth(message.data);
           sendResponse(result);
           break;
+        }
+
+        case 'DEBUG_TOTP': {
+          if (!this.isDev()) {
+            sendResponse({ success: false, error: 'Debug commands are disabled in production' });
+            break;
+          }
+          const debugResult = await this.debugTOTP(message.data);
+          sendResponse(debugResult);
+          break;
+        }
+
+        case 'DEBUG_TIME_SYNC': {
+          if (!this.isDev()) {
+            sendResponse({ success: false, error: 'Debug commands are disabled in production' });
+            break;
+          }
+          sendResponse({ success: true, data: this.totp.debugTimeSync() });
+          break;
+        }
+
+        case 'DEBUG_TEST_VECTORS': {
+          if (!this.isDev()) {
+            sendResponse({ success: false, error: 'Debug commands are disabled in production' });
+            break;
+          }
+          this.totp.debugWithTestVectors();
+          sendResponse({ success: true, message: 'Test vectors executed — check console' });
+          break;
+        }
+
+        case 'DEBUG_TIME_WINDOW': {
+          if (!this.isDev()) {
+            sendResponse({ success: false, error: 'Debug commands are disabled in production' });
+            break;
+          }
+          const twResult = await this.totp.generateTimeWindow(
+            message.data.secret,
+            message.data.algorithm || 'SHA1',
+            message.data.steps || 3
+          );
+          sendResponse({ success: true, data: twResult });
+          break;
+        }
+
+        case 'CAPTURE_TAB': {
+          chrome.tabs.captureVisibleTab(null, { format: 'png' }, (dataUrl) => {
+            if (chrome.runtime.lastError) {
+              sendResponse({ success: false, error: chrome.runtime.lastError.message });
+            } else {
+              sendResponse({ success: true, dataUrl: dataUrl });
+            }
+          });
+          return true; // Keep message channel open for async response
+        }
 
         default:
           sendResponse({ success: false, error: 'Unknown message type' });
@@ -97,16 +240,22 @@ class SecureAuthenticator {
   }
 
   /**
-   * Get all stored accounts
+   * Get all accounts from the encrypted vault
    */
   async getAccounts() {
     try {
-      const result = await chrome.storage.local.get([this.storageKey]);
-      return result[this.storageKey] || [];
+      return await this.vault.get();
     } catch (error) {
       console.error('Error getting accounts:', error);
       return [];
     }
+  }
+
+  /**
+   * Save accounts to the encrypted vault
+   */
+  async saveAccounts(accounts) {
+    await this.vault.set(accounts);
   }
 
   /**
@@ -125,7 +274,6 @@ class SecureAuthenticator {
       createdAt: Date.now(),
       ...accountData
     };
-
     accounts.push(newAccount);
     await this.saveAccounts(accounts);
     return newAccount;
@@ -137,11 +285,7 @@ class SecureAuthenticator {
   async updateAccount(accountData) {
     const accounts = await this.getAccounts();
     const index = accounts.findIndex(acc => acc.id === accountData.id);
-    
-    if (index === -1) {
-      throw new Error('Account not found');
-    }
-
+    if (index === -1) throw new Error('Account not found');
     accounts[index] = { ...accounts[index], ...accountData };
     await this.saveAccounts(accounts);
     return accounts[index];
@@ -152,22 +296,15 @@ class SecureAuthenticator {
    */
   async deleteAccount(accountId) {
     const accounts = await this.getAccounts();
-    const filteredAccounts = accounts.filter(acc => acc.id !== accountId);
-    await this.saveAccounts(filteredAccounts);
+    await this.saveAccounts(accounts.filter(acc => acc.id !== accountId));
   }
 
-  /**
-   * Save accounts to storage
-   */
-  async saveAccounts(accounts) {
-    await chrome.storage.local.set({ [this.storageKey]: accounts });
-  }
 
   /**
    * Generate TOTP code
    */
-  generateTOTP(secret, digits = 6) {
-    return this.totp.generate(secret, 30, digits);
+  async generateTOTP(secret, digits = 6) {
+    return await this.totp.generate(secret, 30, digits);
   }
 
   /**
@@ -176,7 +313,7 @@ class SecureAuthenticator {
   async getTOTPCodesForDomain(domain) {
     const accounts = await this.getAccounts();
     const domainBindings = await this.getDomainBindings();
-    
+
     // Check for bound account first
     const boundAccountId = domainBindings[domain.toLowerCase()];
     if (boundAccountId) {
@@ -187,7 +324,7 @@ class SecureAuthenticator {
             id: boundAccount.id,
             name: boundAccount.name,
             issuer: boundAccount.issuer,
-            code: this.generateTOTP(boundAccount.secret, boundAccount.digits)
+            code: await this.generateTOTP(boundAccount.secret, boundAccount.digits)
           }],
           bound: true
         };
@@ -196,46 +333,37 @@ class SecureAuthenticator {
 
     // Filter accounts by domain matching
     const matchingAccounts = this.filterAccountsByDomain(accounts, domain);
-    
-    if (matchingAccounts.length === 0) {
-      // Return all accounts if no matches
-      return {
-        accounts: accounts.map(account => ({
-          id: account.id,
-          name: account.name,
-          issuer: account.issuer,
-          code: this.generateTOTP(account.secret, account.digits)
-        })),
-        bound: false
-      };
-    }
+    const sourceAccounts = matchingAccounts.length === 0 ? accounts : matchingAccounts;
 
-    return {
-      accounts: matchingAccounts.map(account => ({
+    const accountsWithCodes = await Promise.all(
+      sourceAccounts.map(async account => ({
         id: account.id,
         name: account.name,
         issuer: account.issuer,
-        code: this.generateTOTP(account.secret, account.digits)
-      })),
-      bound: false
-    };
+        code: await this.generateTOTP(account.secret, account.digits)
+      }))
+    );
+
+    return { accounts: accountsWithCodes, bound: false };
   }
 
   /**
    * Filter accounts by domain matching logic
    */
   filterAccountsByDomain(accounts, domain) {
-    const domainLower = domain.toLowerCase();
-    const domainWithoutWww = domainLower.replace(/^www\./, '').split('.')[0];
+    const extractDomainBase = (d) => {
+      if (!d) return '';
+      const parts = d.toLowerCase().replace(/^www\./, '').split('.');
+      return parts.length > 1 ? parts[parts.length - 2] : parts[0];
+    };
+    
+    const domainBase = extractDomainBase(domain);
 
     return accounts.filter(account => {
-      const issuerLower = account.issuer.toLowerCase();
-      const nameLower = account.name.toLowerCase();
+      const issuerBase = extractDomainBase(account.issuer);
+      const nameBase = extractDomainBase(account.name);
 
-      return domainLower.includes(issuerLower) ||
-             issuerLower.includes(domainWithoutWww) ||
-             domainLower.includes(nameLower) ||
-             nameLower.includes(domainWithoutWww);
+      return issuerBase === domainBase || nameBase === domainBase;
     });
   }
 
@@ -331,52 +459,188 @@ class SecureAuthenticator {
   async importFromOtpauth(otpauthData) {
     const accounts = await this.getAccounts();
     
-    // Parse each otpauth URI
+    // Parse each otpauth URI according to RFC 6063
     const otpauthLines = otpauthData.split('\n').filter(line => line.trim().startsWith('otpauth://'));
     const newAccounts = otpauthLines.map(line => {
       try {
+        // RFC 6063: Validate URI length (max 2048 characters)
+        if (line.length > 2048) {
+          throw new Error('URI too long');
+        }
+        
         const url = new URL(line);
+        
+        // RFC 6063: Validate scheme
+        if (url.protocol !== 'otpauth:') {
+          throw new Error('Invalid scheme');
+        }
+        
+        // RFC 6063: Parse type (totp/hotp)
+        const type = url.host.toLowerCase();
+        if (!['totp', 'hotp'].includes(type)) {
+          throw new Error('Invalid OTP type');
+        }
+        if (type === 'hotp') {
+          throw new Error('HOTP is not supported');
+        }
+        
+        // RFC 6063: Parse label (issuer:accountname)
         const pathParts = url.pathname.substring(1).split(':'); // Remove leading / and split by :
         const params = new URLSearchParams(url.search);
         
-        const issuer = params.get('issuer') || (pathParts.length > 1 ? pathParts[0] : 'Unknown');
-        const accountName = pathParts.length > 1 ? pathParts[1] : (pathParts[0] || 'Unknown');
+        // RFC 6063: Validate required secret parameter
+        const secret = params.get('secret');
+        if (!secret || !/^[A-Z2-7]+=*$/i.test(secret)) {
+          throw new Error('Invalid or missing secret');
+        }
         
-        // Decode URL-encoded characters (like %40 -> @)
+        // RFC 6063: Parse optional parameters with defaults
+        const algorithm = params.get('algorithm') || 'SHA1';
+        const digits = parseInt(params.get('digits')) || 6;
+        const period = parseInt(params.get('period')) || 30;
+        const counter = params.get('counter');
+        
+        // RFC 6063: Validate parameter values
+        if (!['SHA1', 'SHA256', 'SHA512'].includes(algorithm)) {
+          throw new Error('Invalid algorithm');
+        }
+        if (![6, 7, 8].includes(digits)) {
+          throw new Error('Invalid digits');
+        }
+        if (period && ![30, 60, 90].includes(period)) {
+          throw new Error('Invalid period');
+        }
+        if (type === 'hotp' && !counter) {
+          throw new Error('HOTP requires counter');
+        }
+        
+        // RFC 6063: Parse issuer and account name
+        let issuer, accountName;
+        const issuerParam = params.get('issuer');
+        
+        if (pathParts.length === 2) {
+          issuer = pathParts[0];
+          accountName = pathParts[1];
+        } else if (pathParts.length === 1) {
+          accountName = pathParts[0];
+          issuer = issuerParam || 'Unknown';
+        } else {
+          throw new Error('Invalid label format');
+        }
+        
+        // RFC 6063: Issuer parameter takes precedence if different
+        if (issuerParam && issuerParam !== issuer) {
+          issuer = issuerParam;
+        }
+        
+        // Decode URL-encoded characters
         const decodedIssuer = decodeURIComponent(issuer);
         const decodedAccountName = decodeURIComponent(accountName);
+        
+        // RFC 6063: Validate label length (max 255 chars each)
+        if (decodedIssuer.length > 255 || decodedAccountName.length > 255) {
+          throw new Error('Label too long');
+        }
         
         return {
           id: this.generateId(),
           name: decodedAccountName,
           issuer: decodedIssuer,
-          secret: params.get('secret'),
-          algorithm: 'SHA1',
-          digits: 6,
-          period: 30,
+          secret: secret.toUpperCase(),
+          algorithm: algorithm,
+          digits: digits,
+          period: period,
+          counter: counter ? parseInt(counter) : null,
+          type: type,
           createdAt: Date.now()
         };
       } catch (error) {
         console.warn('Failed to parse otpauth line:', line, error);
-        return null;
+        return { isError: true, error: error.message, line };
       }
-    }).filter(account => account !== null);
+    });
 
-    const mergedAccounts = [...accounts, ...newAccounts];
+    // Check for duplicates and errors
+    const duplicates = [];
+    const uniqueNewAccounts = [];
+    const errors = [];
+    
+    for (const item of newAccounts) {
+      if (item.isError) {
+        errors.push(item.error);
+        continue;
+      }
+      
+      const newAccount = item;
+      const isDuplicate = accounts.some(existingAccount => 
+        existingAccount.secret.toLowerCase() === newAccount.secret.toLowerCase() ||
+        (existingAccount.issuer.toLowerCase() === newAccount.issuer.toLowerCase() && 
+         existingAccount.name.toLowerCase() === newAccount.name.toLowerCase())
+      );
+      
+      if (isDuplicate) {
+        duplicates.push(newAccount);
+      } else {
+        uniqueNewAccounts.push(newAccount);
+      }
+    }
+    
+    const mergedAccounts = [...accounts, ...uniqueNewAccounts];
     await this.saveAccounts(mergedAccounts);
     
     return {
       success: true,
-      imported: newAccounts.length,
-      total: mergedAccounts.length
+      imported: uniqueNewAccounts.length,
+      duplicates: duplicates.length,
+      total: mergedAccounts.length,
+      duplicateDetails: duplicates.map(d => `${d.issuer}: ${d.name}`),
+      errors: errors
     };
+  }
+
+  /**
+   * Debug TOTP generation for specific account
+   */
+  async debugTOTP(accountData) {
+    try {
+      const accounts = await this.getAccounts();
+      const account = accounts.find(acc => acc.id === accountData.accountId);
+      
+      if (!account) {
+        return { success: false, error: 'Account not found' };
+      }
+      
+      // Generate detailed debug info
+      const debugInfo = {
+        account: {
+          id: account.id,
+          name: account.name,
+          issuer: account.issuer,
+          secret: account.secret.substring(0, 8) + '...' // Show only first 8 chars for security
+        },
+        currentCode: await this.totp.generate(account.secret, account.period || 30, account.digits || 6, account.algorithm || 'SHA1'),
+        timeWindow: await this.totp.generateTimeWindow(account.secret, account.algorithm || 'SHA1', 2)
+      };
+      
+      return { success: true, data: debugInfo };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
   }
 
   /**
    * Generate unique ID
    */
   generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    return crypto.randomUUID();
+  }
+
+  isDev() {
+    const manifest = chrome.runtime.getManifest();
+    return Boolean(
+      manifest.version_name &&
+      manifest.version_name.toLowerCase().includes('dev')
+    );
   }
 
   /**
@@ -384,7 +648,7 @@ class SecureAuthenticator {
    */
   showWelcomePage() {
     chrome.tabs.create({
-      url: chrome.runtime.getURL('welcome.html')
+      url: chrome.runtime.getURL('popup.html')
     });
   }
 }

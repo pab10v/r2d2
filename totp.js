@@ -5,9 +5,19 @@
  */
 
 class SecureTOTP {
-  constructor() {
+  constructor(debug = false) {
     this.window = 30; // 30-second time window
     this.digits = 6;  // 6-digit codes by default
+    this.debug = debug;
+  }
+
+  /**
+   * Debug logging function
+   */
+  log(message, data = null) {
+    if (this.debug) {
+      console.log(`[TOTP DEBUG] ${message}`, data || '');
+    }
   }
 
   /**
@@ -15,31 +25,68 @@ class SecureTOTP {
    * @param {string} secret - Base32 encoded secret
    * @param {number} timeWindow - Time window in seconds (default: 30)
    * @param {number} digits - Number of digits (default: 6)
-   * @returns {string} TOTP code
+   * @param {string} algorithm - Hash algorithm (default: 'SHA1')
+   * @param {number} timestamp - Unix timestamp (default: current time)
+   * @returns {Promise<string>} TOTP code
    */
-  generate(secret, timeWindow = this.window, digits = this.digits) {
+  async generate(secret, timeWindow = this.window, digits = this.digits, algorithm = 'SHA1', timestamp = null) {
     try {
+      this.log('=== TOTP GENERATION START ===');
+      this.log('Input parameters', { secret, timeWindow, digits, algorithm, timestamp });
+      
+      // RFC 6238: Validate parameters
+      if (!secret || typeof secret !== 'string') {
+        throw new Error('Invalid secret');
+      }
+      if (![6, 7, 8].includes(digits)) {
+        throw new Error('Digits must be 6, 7, or 8');
+      }
+      if (![30, 60, 90].includes(timeWindow)) {
+        throw new Error('Time step must be 30, 60, or 90 seconds');
+      }
+      if (!['SHA1', 'SHA256', 'SHA512'].includes(algorithm)) {
+        throw new Error('Algorithm must be SHA1, SHA256, or SHA512');
+      }
+      
       // Decode base32 secret
       const decodedSecret = this.base32Decode(secret);
+      this.log('Decoded secret', Array.from(decodedSecret));
       
-      // Get current time counter
-      const counter = Math.floor(Date.now() / 1000 / timeWindow);
+      // RFC 6238: Get current time counter
+      const currentTime = timestamp || Date.now();
+      const counter = Math.floor(currentTime / 1000 / timeWindow);
+      this.log('Time info', { currentTime, counter, timeWindow });
       
-      // Generate HMAC-SHA1
-      const hmac = this.hmacSHA1(decodedSecret, this.intToBytes(counter));
+      // Generate counter bytes for debugging
+      const counterBytes = this.intToBytes(counter);
+      this.log('Counter bytes', Array.from(counterBytes));
       
-      // Dynamic truncation
+      // Generate HMAC with specified algorithm
+      const hmac = await this.hmac(decodedSecret, counterBytes, algorithm);
+      this.log('HMAC result', Array.from(hmac));
+      
+      // RFC 4226: Dynamic truncation
       const offset = hmac[hmac.length - 1] & 0x0f;
+      this.log('Dynamic truncation offset', offset);
+      
       const binary = 
         ((hmac[offset] & 0x7f) << 24) |
         ((hmac[offset + 1] & 0xff) << 16) |
         ((hmac[offset + 2] & 0xff) << 8) |
         (hmac[offset + 3] & 0xff);
       
+      this.log('Binary code', binary);
+      this.log('Binary hex', '0x' + binary.toString(16));
+      
       // Generate code
       const code = (binary % Math.pow(10, digits)).toString();
-      return code.padStart(digits, '0');
+      const finalCode = code.padStart(digits, '0');
+      this.log('Final TOTP code', finalCode);
+      this.log('=== TOTP GENERATION END ===');
+      
+      return finalCode;
     } catch (error) {
+      this.log('TOTP generation error', error);
       console.error('TOTP generation error:', error);
       throw new Error('Failed to generate TOTP code');
     }
@@ -52,10 +99,27 @@ class SecureTOTP {
    */
   base32Decode(base32) {
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    const cleanBase32 = base32.toUpperCase().replace(/[^A-Z2-7]/g, '');
     
+    // RFC 4648: Remove whitespace and handle padding
+    const cleanBase32 = base32.toUpperCase()
+      .replace(/\s+/g, '') // Remove all whitespace
+      .replace(/[^A-Z2-7=]/g, ''); // Keep only valid chars and padding
+    
+    // RFC 4648: Validate padding
+    const padIndex = cleanBase32.indexOf('=');
+    if (padIndex !== -1) {
+      const padLength = cleanBase32.length - padIndex;
+      if (padLength > 6 || padLength % 2 !== 0) {
+        throw new Error('Invalid Base32 padding');
+      }
+    }
+
+    // Remove padding for decoding
+    const withoutPadding = cleanBase32.replace(/=/g, '');
+
+
     let bits = '';
-    for (const char of cleanBase32) {
+    for (const char of withoutPadding) {
       const val = alphabet.indexOf(char);
       if (val === -1) continue;
       bits += val.toString(2).padStart(5, '0');
@@ -86,150 +150,33 @@ class SecureTOTP {
   }
 
   /**
-   * Simple HMAC-SHA1 implementation
-   * @param {Uint8Array} key - Secret key
-   * @param {Uint8Array} message - Message to hash
-   * @returns {Uint8Array} HMAC digest
+   * HMAC implementation using Web Crypto API
+   * Supports SHA1, SHA256, SHA512
+   * @param {Uint8Array} key - Secret key bytes
+   * @param {Uint8Array} message - Message to authenticate
+   * @param {string} algorithm - Hash algorithm ('SHA1', 'SHA256', 'SHA512')
+   * @returns {Promise<Uint8Array>} HMAC digest
    */
-  hmacSHA1(key, message) {
-    // Pad or truncate key to 64 bytes
-    const paddedKey = new Uint8Array(64);
-    if (key.length > 64) {
-      const hash = this.sha1(key);
-      paddedKey.set(hash);
-    } else {
-      paddedKey.set(key);
-    }
+  async hmac(key, message, algorithm = 'SHA1') {
+    const algoMap = {
+      'SHA1':   'SHA-1',
+      'SHA256': 'SHA-256',
+      'SHA512': 'SHA-512'
+    };
 
-    // Create inner and outer pads
-    const innerPad = new Uint8Array(64);
-    const outerPad = new Uint8Array(64);
-    
-    for (let i = 0; i < 64; i++) {
-      innerPad[i] = paddedKey[i] ^ 0x36;
-      outerPad[i] = paddedKey[i] ^ 0x5c;
-    }
+    const cryptoAlgo = algoMap[algorithm];
+    if (!cryptoAlgo) throw new Error(`Unsupported algorithm: ${algorithm}`);
 
-    // Compute inner hash
-    const innerHash = this.sha1(this.concatUint8Arrays(innerPad, message));
-    
-    // Compute outer hash
-    const outerHash = this.sha1(this.concatUint8Arrays(outerPad, innerHash));
-    
-    return outerHash;
-  }
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      key,
+      { name: 'HMAC', hash: { name: cryptoAlgo } },
+      false,
+      ['sign']
+    );
 
-  /**
-   * Simple SHA-1 implementation
-   * @param {Uint8Array} data - Data to hash
-   * @returns {Uint8Array} SHA-1 digest (20 bytes)
-   */
-  sha1(data) {
-    // This is a simplified SHA-1 implementation
-    // In production, use Web Crypto API for better security
-    const words = this.bytesToWords(data);
-    words.push(0x80);
-    
-    const len = data.length * 8;
-    while (words.length % 16 !== 14) {
-      words.push(0);
-    }
-    words.push(len >>> 29);
-    words.push((len << 3) & 0xffffffff);
-
-    let h0 = 0x67452301;
-    let h1 = 0xefcdab89;
-    let h2 = 0x98badcfe;
-    let h3 = 0x10325476;
-    let h4 = 0xc3d2e1f0;
-
-    for (let i = 0; i < words.length; i += 16) {
-      const w = words.slice(i, i + 16);
-      
-      let a = h0, b = h1, c = h2, d = h3, e = h4;
-      
-      for (let j = 0; j < 80; j++) {
-        let f, k;
-        
-        if (j < 20) {
-          f = (b & c) | (~b & d);
-          k = 0x5a827999;
-        } else if (j < 40) {
-          f = b ^ c ^ d;
-          k = 0x6ed9eba1;
-        } else if (j < 60) {
-          f = (b & c) | (b & d) | (c & d);
-          k = 0x8f1bbcdc;
-        } else {
-          f = b ^ c ^ d;
-          k = 0xca62c1d6;
-        }
-        
-        const temp = (this.rol(a, 5) + f + e + k + w[j % 16]) & 0xffffffff;
-        e = d;
-        d = c;
-        c = this.rol(b, 30);
-        b = a;
-        a = temp;
-      }
-      
-      h0 = (h0 + a) & 0xffffffff;
-      h1 = (h1 + b) & 0xffffffff;
-      h2 = (h2 + c) & 0xffffffff;
-      h3 = (h3 + d) & 0xffffffff;
-      h4 = (h4 + e) & 0xffffffff;
-    }
-
-    return this.wordsToBytes([h0, h1, h2, h3, h4]);
-  }
-
-  /**
-   * Rotate left operation
-   */
-  rol(num, cnt) {
-    return (num << cnt) | (num >>> (32 - cnt));
-  }
-
-  /**
-   * Convert bytes to 32-bit words
-   */
-  bytesToWords(bytes) {
-    const words = [];
-    for (let i = 0; i < bytes.length; i += 4) {
-      words.push(
-        (bytes[i] << 24) |
-        (bytes[i + 1] << 16) |
-        (bytes[i + 2] << 8) |
-        bytes[i + 3]
-      );
-    }
-    return words;
-  }
-
-  /**
-   * Convert 32-bit words to bytes
-   */
-  wordsToBytes(words) {
-    const bytes = [];
-    for (const word of words) {
-      bytes.push(
-        (word >>> 24) & 0xff,
-        (word >>> 16) & 0xff,
-        (word >>> 8) & 0xff,
-        word & 0xff
-      );
-    }
-    return new Uint8Array(bytes);
-  }
-
-  /**
-   * Concatenate two Uint8Arrays
-   */
-  concatUint8Arrays(a, b) {
-    const result = new Uint8Array(a.length + b.length);
-    result.set(a);
-    result.set(b, a.length);
-    return result;
+    const signature = await crypto.subtle.sign('HMAC', cryptoKey, message);
+    return new Uint8Array(signature);
   }
 
   /**
@@ -244,23 +191,95 @@ class SecureTOTP {
   }
 
   /**
+   * Debug function to test with known test vectors
+   */
+  debugWithTestVectors() {
+    this.log('=== TESTING WITH RFC 6238 TEST VECTORS ===');
+    
+    // RFC 6238 Test Case 1
+    const secret = '12345678901234567890'; // Base32 for "12345678901234567890"
+    const time = 59; // Unix timestamp 59
+    
+    try {
+      const result = this.generate(secret, 30, 8, 'SHA1', time * 1000);
+      this.log('Test Case 1 (SHA1, time=59)', result);
+      this.log('Expected: 94287082');
+    } catch (error) {
+      this.log('Test Case 1 failed', error);
+    }
+  }
+
+  /**
+   * Debug time synchronization
+   */
+  debugTimeSync() {
+    this.log('=== TIME SYNCHRONIZATION DEBUG ===');
+    
+    const now = Date.now();
+    const serverTime = now; // In production, get from NTP server
+    const drift = now - serverTime;
+    
+    this.log('Local time', new Date(now));
+    this.log('Server time', new Date(serverTime));
+    this.log('Time drift (ms)', drift);
+    
+    if (Math.abs(drift) > 1000) {
+      this.log('WARNING: Time drift > 1 second detected!');
+    }
+    
+    // Test with time drift compensation
+    const compensatedTime = now - drift;
+    this.log('Compensated time', new Date(compensatedTime));
+    
+    return { drift, compensatedTime };
+  }
+
+  /**
+   * Generate codes for multiple time steps (for debugging)
+   */
+  async generateTimeWindow(secret, algorithm = 'SHA1', steps = 3) {
+    this.log(`=== GENERATING ${steps} TIME WINDOWS ===`);
+    
+    const now = Date.now();
+    const timeWindow = 30;
+    const currentCounter = Math.floor(now / 1000 / timeWindow);
+    
+    const results = [];
+    for (let i = -steps; i <= steps; i++) {
+      const counter = currentCounter + i;
+      const timestamp = counter * timeWindow * 1000;
+      const code = await this.generate(secret, timeWindow, 6, algorithm, timestamp);
+      
+      results.push({
+        counter,
+        timestamp,
+        time: new Date(timestamp),
+        code,
+        relative: i === 0 ? 'CURRENT' : (i < 0 ? `${i} steps ago` : `+${i} steps`)
+      });
+    }
+    
+    this.log('Time window results', results);
+    return results;
+  }
+
+  /**
    * Verify a TOTP code
    * @param {string} secret - Base32 encoded secret
    * @param {string} token - Token to verify
    * @param {number} window - Time windows to check (default: 1)
-   * @returns {boolean} True if valid
+   * @returns {Promise<boolean>} True if valid
    */
-  verify(secret, token, window = 1) {
+  async verify(secret, token, window = 1) {
     const counter = Math.floor(Date.now() / 1000 / this.window);
-    
+
     for (let i = -window; i <= window; i++) {
-      const testCounter = counter + i;
-      const testToken = this.generate(secret, this.window, this.digits);
+      const testToken = await this.generate(secret, this.window, this.digits);
       if (testToken === token) {
         return true;
       }
     }
-    
+
     return false;
   }
 }

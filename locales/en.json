@@ -19,7 +19,11 @@
     "no_accounts": "No Accounts Yet",
     "add_first": "Add Your First Account",
     "backup_accounts": "Backup Your Accounts",
-    "restore_accounts": "Restore Accounts"
+    "restore_accounts": "Restore Accounts",
+    "confirm": "Confirm",
+    "delete_account_title": "Delete account?",
+    "delete_account_confirm": "Are you sure you want to delete this account? This action cannot be undone.",
+    "export_format": "Export Format"
   },
   "messages": {
     "account_added": "Account added successfully!",
@@ -29,7 +33,19 @@
     "export_success": "Accounts exported successfully!",
     "import_success": "Accounts imported successfully!",
     "no_2fa_accounts": "No 2FA accounts found for this site",
-    "fill_2fa_code": "Fill 2FA code"
+    "fill_2fa_code": "Fill 2FA code",
+    "settings_coming_soon": "Settings coming soon!",
+    "testing_sounds": "Testing R2D2 sounds...",
+    "camera_access_denied": "Camera access denied. Use manual input or allow camera permission.",
+    "camera_initializing": "Initializing camera...",
+    "camera_scanning": "Scanning...",
+    "qr_detected_importing": "QR code detected. Importing...",
+    "qr_import_failed": "Failed to import QR code",
+    "qr_start_failed": "Failed to start QR scanner",
+    "camera_manual_fallback": "Camera access not available. Please enter QR code data manually.",
+    "qr_enter_data": "Please enter QR code data",
+    "qr_invalid_data": "Invalid QR code data",
+    "qr_unsupported_format": "Unsupported QR code format. Please use otpauth:// URI."
   },
   "security": {
     "offline_only": "Works completely offline",

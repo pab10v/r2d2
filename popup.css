@@ -207,6 +207,44 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    /* Room for kebab dropdown below last cards without clipping in scroll area */
+    padding-bottom: 72px;
+}
+
+/* Search Bar */
+.search-container {
+    padding: 0 16px 12px 16px;
+    background: var(--header-bg);
+}
+
+.search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    color: #888;
+    pointer-events: none;
+}
+
+#search-accounts {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    border-radius: 8px;
+    border: 1px solid var(--input-border);
+    background: var(--input-bg);
+    color: var(--text-color);
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+#search-accounts:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.1);
 }
 
 .account-item {
@@ -215,6 +253,7 @@ body {
     padding: 16px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     transition: all 0.2s ease;
+    overflow: visible;
 }
 
 .account-item:hover {
@@ -224,13 +263,14 @@ body {
 
 .account-header {
     display: flex;
-    justify-content: space-between;
+    flex-wrap: wrap;
     align-items: flex-start;
+    gap: 8px 12px;
     margin-bottom: 12px;
 }
 
 .account-icon {
-    margin-right: 12px;
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -241,7 +281,30 @@ body {
 }
 
 .account-info {
-    flex: 1;
+    flex: 1 1 160px;
+    min-width: 0;
+}
+
+.account-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-issuer {
+    font-size: 13px;
+    color: #666;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.theme-dark .account-issuer {
+    color: #aaa;
 }
 
 .account-info h3 {
@@ -256,9 +319,97 @@ body {
     color: #666;
 }
 
+/* Full-width row so actions never clip at narrow popup widths */
 .account-actions {
+    flex: 1 1 100%;
     display: flex;
-    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    row-gap: 8px;
+}
+
+/* Kebab menu + Edit / Delete */
+.more-menu {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.menu-dots {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 18px;
+    line-height: 1;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.menu-dots:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.theme-dark .menu-dots:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.more-dropdown {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    min-width: 132px;
+    padding: 4px;
+    background: var(--item-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.more-menu:focus-within .more-dropdown {
+    display: flex;
+}
+
+.more-dropdown .edit-btn,
+.more-dropdown .delete-btn {
+    width: 100%;
+    margin: 0;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+    font-size: 14px;
+    text-align: left;
+    color: var(--text-color);
+}
+
+.more-dropdown .delete-btn {
+    color: #c62828;
+}
+
+.theme-dark .more-dropdown .delete-btn {
+    color: #ef9a9a;
+}
+
+.more-dropdown .edit-btn:hover,
+.more-dropdown .delete-btn:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.theme-dark .more-dropdown .edit-btn:hover,
+.theme-dark .more-dropdown .delete-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .icon-btn {
@@ -332,6 +483,12 @@ body {
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s ease;
+}
+
+.account-actions .copy-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+    white-space: nowrap;
 }
 
 .copy-btn:hover {

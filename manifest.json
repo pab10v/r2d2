@@ -9,7 +9,9 @@
     "activeTab",
     "scripting",
     "alarms",
-    "offscreen"
+    "offscreen",
+    "contextMenus",
+    "notifications"
   ],
   "optional_permissions": [],
   "host_permissions": [
@@ -47,5 +49,19 @@
       "resources": ["locales/*.json"],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "commands": {
+    "autofill_code": {
+      "suggested_key": {
+        "default": "Alt+L"
+      },
+      "description": "Autofill the 2FA code for the current site"
+    },
+    "scan_qr": {
+      "suggested_key": {
+        "default": "Alt+Q"
+      },
+      "description": "Scan a QR code from the current page"
+    }
+  }
 }

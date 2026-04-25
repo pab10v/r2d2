@@ -33,7 +33,7 @@ class SecureAuthenticatorUI {
       if (message.type === 'VAULT_LOCKED') {
         this.showView('view-unlock');
         this.setupUnlockHandlers();
-        this.showMessage('Vault locked due to inactivity', 'info');
+        this.showMessage(this.t('messages.vault_locked_inactivity'), 'info');
       }
     });
   }
@@ -107,7 +107,7 @@ class SecureAuthenticatorUI {
 
       const btn = form.querySelector('button[type="submit"]');
       btn.disabled = true;
-      btn.textContent = 'Creating vault…';
+      btn.textContent = this.t('ui.creating_vault');
 
       try {
         const res = await this.sendMessage({ type: 'SETUP_VAULT', pin });
@@ -116,12 +116,12 @@ class SecureAuthenticatorUI {
         } else {
           this.showVaultError(errEl, res.error || 'Failed to create vault');
           btn.disabled = false;
-          btn.textContent = 'Create Vault';
+          btn.textContent = this.t('ui.create_vault');
         }
       } catch (err) {
         this.showVaultError(errEl, err.message);
         btn.disabled = false;
-        btn.textContent = 'Create Vault';
+        btn.textContent = this.t('ui.create_vault');
       }
     });
 
@@ -141,7 +141,7 @@ class SecureAuthenticatorUI {
       if (lockTimeout) {
         lockTimeout.addEventListener('change', (e) => {
           chrome.storage.local.set({ vault_lock_timeout: parseInt(e.target.value) });
-          this.showMessage('Lock timeout updated', 'success');
+          this.showMessage(this.t('messages.lock_timeout_updated'), 'success');
         });
       }
 
@@ -174,7 +174,7 @@ class SecureAuthenticatorUI {
             await this.updateTOTPCodes();
           } else {
             if (status) {
-              status.textContent = 'Failed: ' + response.error;
+              status.textContent = `${this.t('messages.sync_failed_prefix')}: ${response.error}`;
               status.style.color = '#f44336';
             }
             this.sounds.playError();
@@ -219,6 +219,15 @@ class SecureAuthenticatorUI {
       });
     }
 
+    // Search accounts listener
+    const searchInput = document.getElementById('search-accounts');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        this.searchQuery = e.target.value.toLowerCase();
+        this.renderAccounts();
+      });
+    }
+
     // Hide "Expand to Tab" if already in a full tab view
     if (window.matchMedia('(min-width: 401px)').matches) {
       const expandBtn = document.getElementById('expand-tab-btn');
@@ -255,7 +264,7 @@ class SecureAuthenticatorUI {
       attemptsEl.style.display = 'none';
       errEl.style.display = 'none';
       btn.disabled = false;
-      btn.textContent = 'Unlock';
+      btn.textContent = this.t('ui.unlock');
     };
 
     resetUnlockView();
@@ -277,7 +286,7 @@ class SecureAuthenticatorUI {
 
       const pin = document.getElementById('unlock-pin').value;
       btn.disabled = true;
-      btn.textContent = 'Unlocking…';
+      btn.textContent = this.t('ui.unlocking');
 
       try {
         const res = await this.sendMessage({ type: 'UNLOCK_VAULT', pin });
@@ -301,12 +310,12 @@ class SecureAuthenticatorUI {
             this.showVaultError(errEl, `Too many attempts. Wait ${blockSeconds} seconds.`);
             attemptsEl.style.display = 'none';
             btn.disabled = true;
-            btn.textContent = 'Locked';
+            btn.textContent = this.t('ui.locked');
 
             setTimeout(() => {
               if (Date.now() >= this.unlockBlockedUntil) {
                 btn.disabled = false;
-                btn.textContent = 'Unlock';
+                btn.textContent = this.t('ui.unlock');
                 errEl.style.display = 'none';
               }
             }, blockMs);
@@ -315,13 +324,13 @@ class SecureAuthenticatorUI {
             attemptsEl.textContent = `${remaining} attempt${remaining !== 1 ? 's' : ''} remaining`;
             attemptsEl.style.display = 'block';
             btn.disabled    = false;
-            btn.textContent = 'Unlock';
+            btn.textContent = this.t('ui.unlock');
           }
         }
       } catch (err) {
         this.showVaultError(errEl, err.message);
         btn.disabled    = false;
-        btn.textContent = 'Unlock';
+        btn.textContent = this.t('ui.unlock');
       }
     });
 
@@ -364,7 +373,7 @@ class SecureAuthenticatorUI {
 
     // Auto-close tab if we just finished initial setup
     if (this.isInitialSetup && window.matchMedia('(min-width: 401px)').matches) {
-      this.showSuccess('Setup complete! You can now use R2D2 from the extension bar. Closing tab...');
+      this.showSuccess(this.t('messages.setup_complete_closing'));
       setTimeout(() => window.close(), 3000);
     }
   }
@@ -501,6 +510,16 @@ class SecureAuthenticatorUI {
     const sortOrder = settings.vault_sort_order || 'manual';
     
     let sortedAccounts = [...this.accounts];
+
+    // Filter by search query
+    if (this.searchQuery) {
+      sortedAccounts = sortedAccounts.filter(acc => {
+        const name = (acc.name || '').toLowerCase();
+        const issuer = (acc.issuer || '').toLowerCase();
+        return name.includes(this.searchQuery) || issuer.includes(this.searchQuery);
+      });
+    }
+
     if (sortOrder === 'alpha') {
       sortedAccounts.sort((a, b) => {
         const nameA = (a.issuer || a.name || '').toLowerCase();
@@ -548,14 +567,14 @@ class SecureAuthenticatorUI {
             <div class="account-issuer">${this.escapeHtml(account.issuer || '')}</div>
           </div>
           <div class="account-actions">
-            <button class="autofill-btn icon-btn" data-account-id="${account.id}" data-code="${code}" title="Autofill in page">
+            <button class="autofill-btn icon-btn" data-account-id="${account.id}" data-code="${code}" title="${this.escapeHtml(this.t('ui.autofill_in_page'))}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                 </svg>
             </button>
-            <button class="copy-btn btn-sm" data-account-id="${account.id}" data-code="${code}">Copy</button>
+            <button class="copy-btn btn-sm" data-account-id="${account.id}" data-code="${code}">${this.escapeHtml(this.t('ui.copy'))}</button>
             ${isHOTP ? `
-            <button class="refresh-btn icon-btn" data-account-id="${account.id}" title="Increment counter">
+            <button class="refresh-btn icon-btn" data-account-id="${account.id}" title="${this.escapeHtml(this.t('ui.increment_counter'))}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
                 </svg>
@@ -563,8 +582,8 @@ class SecureAuthenticatorUI {
             <div class="more-menu">
               <button class="menu-dots">⋮</button>
               <div class="more-dropdown">
-                <button class="edit-btn">Edit</button>
-                <button class="delete-btn">Delete</button>
+                <button class="edit-btn">${this.escapeHtml(this.t('ui.edit'))}</button>
+                <button class="delete-btn">${this.escapeHtml(this.t('ui.delete'))}</button>
               </div>
             </div>
           </div>
@@ -653,7 +672,7 @@ class SecureAuthenticatorUI {
 
       // Ensure we don't try to inject into restricted pages
       if (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://')) {
-        this.showError('Cannot autofill on system pages');
+        this.showError(this.t('messages.autofill_system_pages'));
         return;
       }
 
@@ -701,12 +720,12 @@ class SecureAuthenticatorUI {
             window.close();
           }
         } else {
-          this.showError('No input field found. Click on the code box first.');
+          this.showError(this.t('messages.no_input_field_found'));
         }
       });
     } catch (err) {
       console.error('Autofill error:', err);
-      this.showError('Autofill error: ' + err.message);
+      this.showError(`${this.t('messages.autofill_error')}: ${err.message}`);
     }
   }
 
@@ -714,20 +733,20 @@ class SecureAuthenticatorUI {
     const cleanCode = code.replace(/\s/g, '');
     navigator.clipboard.writeText(cleanCode).then(() => {
       const copyBtn = document.querySelector(`.copy-btn[data-account-id="${accountId}"]`);
-      copyBtn.textContent = 'Copied';
+      copyBtn.textContent = this.t('ui.copied');
       copyBtn.classList.add('copied');
       
       // Play copy sound
       this.sounds.playCopy();
       
       setTimeout(() => {
-        copyBtn.textContent = 'Copy';
+        copyBtn.textContent = this.t('ui.copy');
         copyBtn.classList.remove('copied');
       }, 2000);
     }).catch(err => {
       console.error('Failed to copy code:', err);
       this.sounds.playError();
-      this.showError('Failed to copy code');
+      this.showError(this.t('messages.copy_code_failed'));
     });
   }
 
@@ -973,7 +992,7 @@ class SecureAuthenticatorUI {
         };
 
         passInput.value = '';
-        passInput.addEventListener('input', updateDisplay);
+        passInput.oninput = updateDisplay;
         
         document.getElementById('export-modal').style.display = 'flex';
         
@@ -1011,7 +1030,7 @@ class SecureAuthenticatorUI {
     } catch (error) {
       console.error('Error exporting accounts:', error);
       this.sounds.playError();
-      this.showError('Failed to export accounts');
+      this.showError(this.t('messages.export_failed'));
     }
     this.hideMenu();
   }
@@ -1028,9 +1047,9 @@ class SecureAuthenticatorUI {
     });
 
     const copyBtn = document.getElementById('copy-export-btn');
-    copyBtn.textContent = '✓ Copied';
+    copyBtn.textContent = this.t('ui.copied_short');
     setTimeout(() => {
-      copyBtn.textContent = '📋 Copy to Clipboard';
+      copyBtn.textContent = this.t('ui.copy_to_clipboard');
     }, 2000);
   }
 
@@ -1047,7 +1066,7 @@ class SecureAuthenticatorUI {
     reader.onload = async (e) => {
       const content = e.target.result;
       document.getElementById('import-data').value = content;
-      this.showMessage('File loaded. Click Import to continue.', 'info');
+      this.showMessage(this.t('messages.file_loaded_continue_import'), 'info');
     };
     reader.readAsText(file);
   }
@@ -1165,12 +1184,12 @@ class SecureAuthenticatorUI {
     const confirmPin = document.getElementById('confirm-new-pin').value;
 
     if (newPin !== confirmPin) {
-      this.showError('New PINs do not match');
+      this.showError(this.t('messages.new_pins_no_match'));
       return;
     }
 
     if (newPin.length < 4) {
-      this.showError('New PIN must be at least 4 digits');
+      this.showError(this.t('messages.new_pin_min_length'));
       return;
     }
 
@@ -1182,14 +1201,14 @@ class SecureAuthenticatorUI {
 
       if (response.success) {
         this.hideChangePinModal();
-        this.showSuccess('PIN updated successfully');
+        this.showSuccess(this.t('messages.pin_updated_success'));
         this.sounds.playSuccess();
       } else {
         this.showError(response.error || 'Failed to update PIN');
         this.sounds.playError();
       }
     } catch (error) {
-      this.showError('Error updating PIN');
+      this.showError(this.t('messages.pin_update_error'));
       console.error(error);
     }
   }
@@ -1224,42 +1243,42 @@ class SecureAuthenticatorUI {
     debugModal.innerHTML = `
       <div class="modal-content">
         <div class="modal-header">
-          <h2>Debug TOTP</h2>
+          <h2>${this.t('ui.debug_totp')}</h2>
           <button class="close-btn">&times;</button>
         </div>
         <div class="debug-content">
           <div class="debug-section">
-            <h3>Time Synchronization</h3>
-            <button id="debug-time-sync" class="btn btn-secondary">Check Time Sync</button>
+            <h3>${this.t('ui.time_sync')}</h3>
+            <button id="debug-time-sync" class="btn btn-secondary">${this.t('ui.check_time_sync')}</button>
             <div id="time-sync-result"></div>
           </div>
           
           <div class="debug-section">
-            <h3>Test Vectors (RFC 6238)</h3>
-            <button id="debug-test-vectors" class="btn btn-secondary">Run Test Vectors</button>
+            <h3>${this.t('ui.test_vectors_rfc6238')}</h3>
+            <button id="debug-test-vectors" class="btn btn-secondary">${this.t('ui.run_test_vectors')}</button>
             <div id="test-vectors-result"></div>
           </div>
           
           <div class="debug-section">
-            <h3>Account Debug</h3>
+            <h3>${this.t('ui.account_debug')}</h3>
             <select id="debug-account-select">
-              <option value="">Select account...</option>
+              <option value="">${this.t('ui.select_account')}</option>
             </select>
-            <button id="debug-account" class="btn btn-secondary">Debug Account</button>
+            <button id="debug-account" class="btn btn-secondary">${this.t('ui.debug_account')}</button>
             <div id="account-debug-result"></div>
           </div>
           
           <div class="debug-section">
-            <h3>Time Window Analysis</h3>
+            <h3>${this.t('ui.time_window_analysis')}</h3>
             <select id="debug-time-account">
-              <option value="">Select account...</option>
+              <option value="">${this.t('ui.select_account')}</option>
             </select>
-            <button id="debug-time-window" class="btn btn-secondary">Analyze Time Windows</button>
+            <button id="debug-time-window" class="btn btn-secondary">${this.t('ui.analyze_time_windows')}</button>
             <div id="time-window-result"></div>
           </div>
         </div>
         <div class="form-actions">
-          <button id="close-debug-modal" class="btn btn-primary">Close</button>
+          <button id="close-debug-modal" class="btn btn-primary">${this.t('ui.close')}</button>
         </div>
       </div>
     `;
@@ -1292,7 +1311,7 @@ class SecureAuthenticatorUI {
     ];
     
     selects.forEach(select => {
-      select.innerHTML = '<option value="">Select account...</option>';
+      select.innerHTML = `<option value="">${this.t('ui.select_account')}</option>`;
       this.accounts.forEach(account => {
         const option = document.createElement('option');
         option.value = account.id;
@@ -1433,9 +1452,15 @@ class SecureAuthenticatorUI {
   }
 
   hideAllModals() {
-    document.querySelectorAll('.modal').forEach(modal => {
+    const qrModal = document.getElementById('qr-scanner-modal');
+    const qrWasOpen = qrModal && qrModal.style.display !== 'none';
+    document.querySelectorAll('.modal').forEach((modal) => {
       modal.style.display = 'none';
     });
+    if (qrWasOpen && this.qrScanner) {
+      this.qrScanner.stop();
+      this.qrScanner = null;
+    }
   }
 
   showMessage(message, type = 'info') {
@@ -1574,22 +1599,26 @@ class SecureAuthenticatorUI {
 
   async scanCurrentTab() {
     try {
-      this.showMessage('Scanning current tab...', 'info');
+      this.showMessage(this.t('messages.scanning_current_tab'), 'info');
       const response = await this.sendMessage({ type: 'CAPTURE_TAB' });
-      
+
+      // User may close the modal while capture runs; hideQRScannerModal() nulls qrScanner.
+      // scanImage() does not need camera — use a throwaway instance if needed.
+      const qrDecoder = this.qrScanner || new QRScanner();
+
       if (response && response.success && response.dataUrl) {
-        const qrData = await this.qrScanner.scanImage(response.dataUrl);
+        const qrData = await qrDecoder.scanImage(response.dataUrl);
         if (qrData) {
           await this.importOtpauthData(qrData);
         } else {
-          this.showError('No QR code found on the current page');
+          this.showError(this.t('messages.no_qr_current_page'));
         }
       } else {
-        this.showError('Failed to capture tab: ' + (response?.error || 'Unknown error'));
+        this.showError(`${this.t('messages.capture_failed')}: ${response?.error || this.t('messages.unknown_error')}`);
       }
     } catch (err) {
       console.error('Scan tab error:', err);
-      this.showError('Capture error: ' + err.message);
+      this.showError(`${this.t('messages.capture_error')}: ${err.message}`);
     }
   }
 
@@ -1702,8 +1731,8 @@ class SecureAuthenticatorUI {
     }
     
     try {
-      // Parse the QR data
-      const qrData = this.qrScanner.parseQRCode(input);
+      const decoder = this.qrScanner || new QRScanner();
+      const qrData = decoder.parseQRCode(input);
       
       if (!qrData) {
         this.showError(this.t('messages.qr_invalid_data'));

@@ -219,7 +219,7 @@ class SecureVault {
       // Import the resulting raw hash as a CryptoKey
       return crypto.subtle.importKey(
         'raw', 
-        result.hash, 
+        new Uint8Array(result.hash), 
         { name: 'AES-GCM' }, 
         false, 
         ['encrypt', 'decrypt']
@@ -237,7 +237,7 @@ class SecureVault {
 
     // 2. Fallback to local sandbox iframe (Popup context)
     return new Promise((resolve, reject) => {
-      const id = Math.random().toString(36).substring(2);
+      const id = this._generateRequestId();
       
       const listener = (event) => {
         if (event.data && event.data.id === id) {
@@ -290,6 +290,10 @@ class SecureVault {
       bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
     }
     return bytes;
+  }
+
+  _generateRequestId() {
+    return crypto.randomUUID();
   }
 }
 

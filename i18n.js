@@ -150,6 +150,12 @@ class R2D2I18n {
       }
     });
 
+    // Update placeholders explicitly marked for translation
+    document.querySelectorAll('[data-i18n-placeholder]').forEach((element) => {
+      const key = element.getAttribute('data-i18n-placeholder');
+      element.setAttribute('placeholder', this.t(key));
+    });
+
     // Update title
     const titleKey = document.querySelector('title')?.getAttribute('data-i18n');
     if (titleKey) {

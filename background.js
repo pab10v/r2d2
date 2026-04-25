@@ -19,7 +19,7 @@ class SecureAuthenticator {
     // Initialize event listeners
     this.initEventListeners();
     this.setupAutoLock();
-    this.OFFSCREEN_PATH = 'sandbox.html';
+    this.OFFSCREEN_PATH = 'offscreen.html';
   }
 
   async initTimeOffset() {
@@ -102,15 +102,37 @@ class SecureAuthenticator {
 
     // Message handling from content scripts and popup
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      const isBridgeMessage =
+        message &&
+        (message.target === 'background' || message.target === 'offscreen');
       this.handleMessage(message, sender, sendResponse);
-      return true; // Keep message channel open for async response
+      // Bridge/offscreen messages are fire-and-forget and do not require sendResponse.
+      return !isBridgeMessage;
     });
+
+    // Keyboard commands
+    chrome.commands.onCommand.addListener((command) => {
+      this.handleCommand(command);
+    });
+
+    // Context menus
+    chrome.contextMenus.onClicked.addListener((info, tab) => {
+      this.handleContextMenuClick(info, tab);
+    });
+
+    // Update menus on start
+    this.updateContextMenus();
   }
 
   /**
    * Handle incoming messages
    */
   async handleMessage(message, sender, sendResponse) {
+    // Ignore bridge/internal messages handled by dedicated listeners
+    if (message && (message.target === 'background' || message.target === 'offscreen')) {
+      return;
+    }
+
     await this.updateLastInteraction();
     try {
       // ── Vault management (no auth required) ──────────────────────────────
@@ -123,19 +145,23 @@ class SecureAuthenticator {
         }
 
         case 'SETUP_VAULT': {
+          console.log('Background: Starting SETUP_VAULT');
           await this.vault.setup(message.pin);
+          console.log('Background: SETUP_VAULT complete');
           sendResponse({ success: true });
           return;
         }
 
         case 'UNLOCK_VAULT': {
           const ok = await this.vault.unlock(message.pin);
+          if (ok) this.updateContextMenus();
           sendResponse({ success: true, unlocked: ok });
           return;
         }
 
         case 'LOCK_VAULT': {
           this.vault.lock();
+          this.updateContextMenus();
           sendResponse({ success: true });
           return;
         }
@@ -176,18 +202,21 @@ class SecureAuthenticator {
 
         case 'ADD_ACCOUNT': {
           const addedAccount = await this.addAccount(message.account);
+          this.updateContextMenus();
           sendResponse({ success: true, account: addedAccount });
           break;
         }
 
         case 'UPDATE_ACCOUNT': {
           const updatedAccount = await this.updateAccount(message.account);
+          this.updateContextMenus();
           sendResponse({ success: true, account: updatedAccount });
           break;
         }
 
         case 'DELETE_ACCOUNT': {
           await this.deleteAccount(message.accountId);
+          this.updateContextMenus();
           sendResponse({ success: true });
           break;
         }
@@ -218,12 +247,14 @@ class SecureAuthenticator {
 
         case 'IMPORT_ACCOUNTS': {
           await this.importAccounts(message.data);
+          this.updateContextMenus();
           sendResponse({ success: true });
           break;
         }
 
         case 'IMPORT_FROM_OTPAUTH': {
           const result = await this.importFromOtpauth(message.data);
+          if (result.success) this.updateContextMenus();
           sendResponse(result);
           break;
         }
@@ -291,36 +322,215 @@ class SecureAuthenticator {
     }
   }
 
+  async handleCommand(command) {
+    if (command === 'autofill_code') {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab || !tab.url || tab.url.startsWith('chrome://')) return;
+      
+      const account = await this.findMatchingAccount(tab.url);
+      if (account) {
+        const code = await this.generateCodeForAccount(account);
+        chrome.tabs.sendMessage(tab.id, { type: 'AUTOFILL', code });
+      }
+    } else if (command === 'scan_qr') {
+      this.handleScanQRCommand();
+    }
+  }
+
+  async handleScanQRCommand() {
+    try {
+      // 1. Capture the tab
+      const dataUrl = await new Promise((resolve, reject) => {
+        chrome.tabs.captureVisibleTab(null, { format: 'png' }, (dataUrl) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve(dataUrl);
+        });
+      });
+
+      // 2. Detect QR in Offscreen Document
+      const result = await this.detectQROffscreen(dataUrl);
+      
+      if (!result.code) {
+        this.showNotification('R2D2: QR Not Found', 'No QR code detected on the current page.');
+        return;
+      }
+
+      // 3. Import from otpauth URI
+      if (result.code.startsWith('otpauth://')) {
+        const importResult = await this.importFromOtpauth(result.code);
+        if (importResult.success) {
+          this.updateContextMenus();
+          this.showNotification('R2D2: Success', `Account "${importResult.account.name}" imported successfully.`);
+        } else {
+          this.showNotification('R2D2: Error', 'Failed to import QR data.');
+        }
+      } else {
+        this.showNotification('R2D2: Unsupported QR', 'This QR code is not a valid OTP setup URI.');
+      }
+    } catch (error) {
+      console.error('Scan QR Command error:', error);
+      this.showNotification('R2D2: Scan Error', error.message);
+    }
+  }
+
+  async detectQROffscreen(dataUrl) {
+    try {
+      const result = await this._callOffscreen('detect_qr', { dataUrl });
+      return { success: true, code: result.code };
+    } catch (error) {
+      console.error('detectQROffscreen error:', error);
+      throw error;
+    }
+  }
+
+  async _callOffscreen(action, payload, timeout = 30000) {
+    console.log(`Background: _callOffscreen starting for ${action}`);
+    await this.ensureOffscreenDocument();
+    console.log(`Background: Offscreen document ensured for ${action}`);
+    
+    return new Promise((resolve, reject) => {
+      const id = this.generateRequestId();
+      
+      const timer = setTimeout(() => {
+        console.error(`Background: _callOffscreen TIMEOUT for ${action}`);
+        chrome.runtime.onMessage.removeListener(listener);
+        reject(new Error(`Offscreen timeout (${action}) ID: ${id}`));
+      }, timeout);
+
+      const listener = (message) => {
+        if (message.target === 'background' && message.id === id) {
+          console.log(`Background: _callOffscreen response received for ${action}`);
+          clearTimeout(timer);
+          chrome.runtime.onMessage.removeListener(listener);
+          if (message.action.endsWith('_success')) {
+            resolve(message.payload);
+          } else {
+            reject(new Error(message.payload.error || 'Unknown offscreen error'));
+          }
+        }
+      };
+
+      chrome.runtime.onMessage.addListener(listener);
+
+      console.log(`Background: _callOffscreen sending message for ${action}`);
+      chrome.runtime.sendMessage({
+        target: 'offscreen',
+        action,
+        payload,
+        id
+      });
+    });
+  }
+
+  showNotification(title, message) {
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon.svg',
+      title: title,
+      message: message,
+      priority: 2
+    });
+  }
+
+  async handleContextMenuClick(info, tab) {
+    if (info.menuItemId === 'unlock-vault') {
+      chrome.action.openPopup();
+      return;
+    }
+    
+    if (info.menuItemId.startsWith('fill-')) {
+      const accountId = info.menuItemId.replace('fill-', '');
+      const accounts = await this.vault.get();
+      const account = accounts.find(a => a.id === accountId);
+      if (account) {
+        const code = await this.generateCodeForAccount(account);
+        chrome.tabs.sendMessage(tab.id, { type: 'AUTOFILL', code });
+      }
+    }
+  }
+
+  async updateContextMenus() {
+    try {
+      chrome.contextMenus.removeAll();
+      if (this.vault.isLocked()) {
+        chrome.contextMenus.create({
+          id: 'unlock-vault',
+          title: 'Unlock R2D2 Vault',
+          contexts: ['editable']
+        });
+        return;
+      }
+
+      const accounts = await this.vault.get();
+      if (accounts.length === 0) return;
+
+      chrome.contextMenus.create({
+        id: 'r2d2-root',
+        title: 'R2D2: Insert Code',
+        contexts: ['editable']
+      });
+
+      // Show up to 5 accounts in the menu
+      for (const account of accounts.slice(0, 5)) {
+        chrome.contextMenus.create({
+          id: `fill-${account.id}`,
+          parentId: 'r2d2-root',
+          title: account.name,
+          contexts: ['editable']
+        });
+      }
+    } catch (error) {
+      console.error('Error updating context menus:', error);
+    }
+  }
+
+  async findMatchingAccount(url) {
+    if (this.vault.isLocked()) return null;
+    const accounts = await this.vault.get();
+    let hostname;
+    try {
+      hostname = new URL(url).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+    
+    // 1. Try explicit domain binding
+    const data = await chrome.storage.local.get(this.domainBindingKey);
+    const domainBindings = data[this.domainBindingKey] || {};
+    const boundAccountId = domainBindings[hostname];
+    if (boundAccountId) {
+      const match = accounts.find(a => a.id === boundAccountId);
+      if (match) return match;
+    }
+    
+    // 2. Fallback to issuer/name matching
+    return accounts.find(acc => {
+      const issuer = (acc.issuer || '').toLowerCase();
+      const name = acc.name.toLowerCase();
+      return (issuer && hostname.includes(issuer)) || hostname.includes(name);
+    });
+  }
+
+  async generateCodeForAccount(account) {
+    if (account.type === 'HOTP') {
+      const code = await this.totp.generateHOTP(account.secret, account.counter || 0, account.digits || 6);
+      // Increment counter
+      account.counter = (account.counter || 0) + 1;
+      await this.vault.saveAccount(account);
+      this.updateContextMenus(); // update menu if counter changes? (not strictly needed but good for state)
+      return code;
+    } else {
+      return await this.totp.generate(account.secret, account.period || 30, account.digits || 6);
+    }
+  }
+
   /**
    * Derive a key using Argon2 via an Offscreen Document
    */
   async deriveKeyOffscreen(password, salt) {
     try {
-      await this.ensureOffscreenDocument();
-      
-      return new Promise((resolve, reject) => {
-        const id = Math.random().toString(36).substring(2);
-        
-        const listener = (message) => {
-          if (message.target === 'offscreen' && message.id === id) {
-            chrome.runtime.onMessage.removeListener(listener);
-            if (message.action === 'derive_key_success') {
-              resolve({ success: true, hash: message.payload.hash });
-            } else {
-              reject(new Error(message.payload.error));
-            }
-          }
-        };
-
-        chrome.runtime.onMessage.addListener(listener);
-
-        chrome.runtime.sendMessage({
-          target: 'offscreen',
-          action: 'derive_key',
-          payload: { password, salt },
-          id: id
-        });
-      });
+      const result = await this._callOffscreen('derive_key', { password, salt });
+      return { success: true, hash: result.hash };
     } catch (error) {
       console.error('Offscreen Argon2 error:', error);
       return { success: false, error: error.message };
@@ -328,6 +538,12 @@ class SecureAuthenticator {
   }
 
   async ensureOffscreenDocument() {
+    // If a document is already being created, wait for it
+    if (this.creatingOffscreenDocument) {
+      await this.creatingOffscreenDocument;
+      return;
+    }
+
     const existingContexts = await chrome.runtime.getContexts({
       contextTypes: ['OFFSCREEN_DOCUMENT']
     });
@@ -336,11 +552,42 @@ class SecureAuthenticator {
       return;
     }
 
-    await chrome.offscreen.createDocument({
+    // Create the document and store the promise
+    this.creatingOffscreenDocument = chrome.offscreen.createDocument({
       url: this.OFFSCREEN_PATH,
-      reasons: ['LOCAL_STORAGE'], // Using LOCAL_STORAGE as a generic reason for crypto
-      justification: 'Argon2 key derivation for secure vault'
+      reasons: ['LOCAL_STORAGE'], 
+      justification: 'Argon2 key derivation and QR scanning for secure vault'
     });
+
+    try {
+      await this.creatingOffscreenDocument;
+      // The bridge will send OFFSCREEN_READY when it and the sandbox are loaded
+      console.log('Background: Offscreen document created, waiting for ready signal...');
+      
+      // We still use a small timeout as fallback, but the ready signal is better
+      await new Promise(resolve => {
+        const timeout = setTimeout(() => {
+          console.warn('Background: Offscreen document READY timeout');
+          chrome.runtime.onMessage.removeListener(listener);
+          resolve();
+        }, 2000);
+
+        const listener = (msg) => {
+          if (msg.action === 'OFFSCREEN_READY') {
+            clearTimeout(timeout);
+            chrome.runtime.onMessage.removeListener(listener);
+            console.log('Background: Offscreen document READY');
+            resolve();
+          }
+        };
+        chrome.runtime.onMessage.addListener(listener);
+      });
+    } catch (error) {
+      console.error('Error creating offscreen document:', error);
+      throw error;
+    } finally {
+      this.creatingOffscreenDocument = null;
+    }
   }
 
   /**
@@ -437,10 +684,12 @@ class SecureAuthenticator {
 
     // Filter accounts by domain matching
     const matchingAccounts = this.filterAccountsByDomain(accounts, domain);
-    const sourceAccounts = matchingAccounts.length === 0 ? accounts : matchingAccounts;
+    if (matchingAccounts.length === 0) {
+      return { accounts: [], bound: false };
+    }
 
     const accountsWithCodes = await Promise.all(
-      sourceAccounts.map(async account => ({
+      matchingAccounts.map(async account => ({
         id: account.id,
         name: account.name,
         issuer: account.issuer,
@@ -455,19 +704,63 @@ class SecureAuthenticator {
    * Filter accounts by domain matching logic
    */
   filterAccountsByDomain(accounts, domain) {
-    const extractDomainBase = (d) => {
-      if (!d) return '';
-      const parts = d.toLowerCase().replace(/^www\./, '').split('.');
-      return parts.length > 1 ? parts[parts.length - 2] : parts[0];
-    };
-    
-    const domainBase = extractDomainBase(domain);
+    const normalizedHost = this.normalizeHostLikeValue(domain);
+    if (!normalizedHost) return [];
 
-    return accounts.filter(account => {
-      const issuerBase = extractDomainBase(account.issuer);
-      const nameBase = extractDomainBase(account.name);
+    return accounts.filter((account) => this.accountMatchesDomain(account, normalizedHost));
+  }
 
-      return issuerBase === domainBase || nameBase === domainBase;
+  normalizeHostLikeValue(value) {
+    if (!value || typeof value !== 'string') return '';
+
+    let normalized = value.trim().toLowerCase();
+    if (!normalized) return '';
+
+    // Handle account-like identifiers such as "user@example.com".
+    const atIndex = normalized.lastIndexOf('@');
+    if (atIndex > 0) {
+      normalized = normalized.slice(atIndex + 1);
+    }
+
+    // Handle issuer strings that may include protocol/path/port.
+    normalized = normalized.replace(/^[a-z]+:\/\//, '');
+    normalized = normalized.split('/')[0].split(':')[0];
+    normalized = normalized.replace(/^www\./, '');
+    normalized = normalized.replace(/\.+$/g, '');
+
+    // Keep only host-safe characters.
+    normalized = normalized.replace(/[^a-z0-9.-]/g, '');
+    return normalized;
+  }
+
+  getRegistrableDomain(host) {
+    const parts = host.split('.').filter(Boolean);
+    if (parts.length <= 2) return host;
+
+    const last = parts[parts.length - 1];
+    const secondLast = parts[parts.length - 2];
+    // Heuristic for common ccTLD second-level domains (co.uk, com.mx, etc.).
+    if (last.length === 2 && secondLast.length <= 3 && parts.length >= 3) {
+      return parts.slice(-3).join('.');
+    }
+    return parts.slice(-2).join('.');
+  }
+
+  accountMatchesDomain(account, normalizedHost) {
+    const hostLabels = normalizedHost.split('.').filter(Boolean);
+    const registrable = this.getRegistrableDomain(normalizedHost);
+    const candidates = [account.issuer, account.name]
+      .map((value) => this.normalizeHostLikeValue(value))
+      .filter(Boolean);
+
+    return candidates.some((candidate) => {
+      // Full host or domain candidate (e.g., google.com).
+      if (candidate.includes('.')) {
+        return normalizedHost === candidate || normalizedHost.endsWith(`.${candidate}`);
+      }
+
+      // Single-label candidate (e.g., google) must match a full label, not substring.
+      return hostLabels.includes(candidate) || registrable.startsWith(`${candidate}.`);
     });
   }
 
@@ -736,6 +1029,10 @@ class SecureAuthenticator {
    * Generate unique ID
    */
   generateId() {
+    return crypto.randomUUID();
+  }
+
+  generateRequestId() {
     return crypto.randomUUID();
   }
 

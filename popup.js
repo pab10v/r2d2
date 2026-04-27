@@ -22,7 +22,14 @@ class SecureAuthenticatorUI {
     this.unlockLockoutLevel = 0;
     this.maxUnlockAttempts = 5;
     this.qrListenersBound = false;
+    this.mainListenersBound = false;
     this.lastCodeWindowByAccount = {};
+    this.codeRefreshTimeoutId = null;
+    this.contextDomain = null;
+    this.contextRelatedAccountIds = null;
+    this.contextFilterEnabled = true;
+    this.siteIntegrationOrigin = null;
+    this.driveHandlersBound = false;
     
     this.setupBackgroundListeners();
     this.init();
@@ -129,7 +136,16 @@ class SecureAuthenticatorUI {
   }
 
   async initSettings() {
-    const settings = await chrome.storage.local.get(['vault_lock_timeout', 'vault_theme', 'vault_sort_order']);
+    const settings = await chrome.storage.local.get([
+      'vault_lock_timeout',
+      'vault_theme',
+      'vault_sort_order',
+      'vault_sounds_enabled'
+    ]);
+    
+    // Update inactivity timeout to match user settings
+    const timeoutMin = settings.vault_lock_timeout !== undefined ? settings.vault_lock_timeout : 5;
+    this.inactivityTimeoutMs = timeoutMin === 0 ? 0 : timeoutMin * 60 * 1000;
     
     // Set lock timeout select
     const lockSelect = document.getElementById('lock-timeout');
@@ -140,7 +156,9 @@ class SecureAuthenticatorUI {
       const lockTimeout = document.getElementById('lock-timeout');
       if (lockTimeout) {
         lockTimeout.addEventListener('change', (e) => {
-          chrome.storage.local.set({ vault_lock_timeout: parseInt(e.target.value) });
+          const newTimeout = parseInt(e.target.value);
+          chrome.storage.local.set({ vault_lock_timeout: newTimeout });
+          this.inactivityTimeoutMs = newTimeout === 0 ? 0 : newTimeout * 60 * 1000;
           this.showMessage(this.t('messages.lock_timeout_updated'), 'success');
         });
       }
@@ -153,7 +171,7 @@ class SecureAuthenticatorUI {
           const originalText = syncBtn.innerHTML;
           
           syncBtn.disabled = true;
-          syncBtn.innerHTML = '<span>⏳</span> Syncing...';
+          syncBtn.innerHTML = `<span>⏳</span> ${this.t('ui.syncing')}`;
           if (status) status.textContent = '';
           
           const response = await this.sendMessage({ type: 'SYNC_TIME' });
@@ -164,7 +182,7 @@ class SecureAuthenticatorUI {
           if (response.success) {
             const offsetSec = Math.round(response.offset / 1000);
             if (status) {
-              status.textContent = `Success! Drift: ${offsetSec}s`;
+              status.textContent = this.t('messages.sync_success_drift', { seconds: offsetSec });
               status.style.color = '#4CAF50';
             }
             this.sounds.playSuccess();
@@ -227,6 +245,14 @@ class SecureAuthenticatorUI {
         this.renderAccounts();
       });
     }
+    const showAllBtn = document.getElementById('show-all-accounts-btn');
+    if (showAllBtn) {
+      showAllBtn.addEventListener('click', () => {
+        this.contextFilterEnabled = false;
+        this.renderContextFilterInfo();
+        this.renderAccounts();
+      });
+    }
 
     // Hide "Expand to Tab" if already in a full tab view
     if (window.matchMedia('(min-width: 401px)').matches) {
@@ -238,6 +264,10 @@ class SecureAuthenticatorUI {
         closeTabBtn.style.display = 'block';
         closeTabBtn.addEventListener('click', () => window.close());
       }
+    }
+
+    if (typeof settings.vault_sounds_enabled === 'boolean') {
+      this.sounds.enabled = settings.vault_sounds_enabled;
     }
   }
 
@@ -307,7 +337,7 @@ class SecureAuthenticatorUI {
             this.unlockAttempts = 0;
             this.unlockLockoutLevel = Math.min(this.unlockLockoutLevel + 1, 6);
 
-            this.showVaultError(errEl, `Too many attempts. Wait ${blockSeconds} seconds.`);
+            this.showVaultError(errEl, this.t('messages.too_many_attempts_wait', { seconds: blockSeconds }));
             attemptsEl.style.display = 'none';
             btn.disabled = true;
             btn.textContent = this.t('ui.locked');
@@ -320,8 +350,8 @@ class SecureAuthenticatorUI {
               }
             }, blockMs);
           } else {
-            this.showVaultError(errEl, 'Incorrect PIN');
-            attemptsEl.textContent = `${remaining} attempt${remaining !== 1 ? 's' : ''} remaining`;
+            this.showVaultError(errEl, this.t('messages.incorrect_pin'));
+            attemptsEl.textContent = this.t('messages.attempts_remaining', { count: remaining });
             attemptsEl.style.display = 'block';
             btn.disabled    = false;
             btn.textContent = this.t('ui.unlock');
@@ -345,7 +375,7 @@ class SecureAuthenticatorUI {
         this.totp.setTimeOffset(data.vault_time_offset);
       }
     } catch (error) {
-      console.error('Error initializing time offset:', error);
+      this.logError(error, 'initTimeOffset', false);
     }
   }
 
@@ -364,11 +394,16 @@ class SecureAuthenticatorUI {
     this.showView('view-main');
     this.applyEnvironmentFlags();
     await this.loadAccounts();
+    await this.loadContextDomainMatches();
     this.setupEventListeners();
     this.initTimeOffset();
     await this.renderAccounts();
     this.startTOTPUpdates();
     this.setupInactivityLock();
+    this.handleStartupRoute();
+    this.updateSoundsToggleLabel(this.sounds.enabled);
+    await this.initSiteIntegrationControls();
+    await this.initDriveBackupControls();
     setTimeout(() => this.sounds.playWelcome(), 300);
 
     // Auto-close tab if we just finished initial setup
@@ -379,6 +414,10 @@ class SecureAuthenticatorUI {
   }
 
   setupEventListeners() {
+    if (this.mainListenersBound) {
+      return;
+    }
+
     // Header buttons
     document.getElementById('add-account-btn').addEventListener('click', () => this.showAddAccountModal());
     document.getElementById('menu-btn').addEventListener('click', () => this.toggleMenu());
@@ -390,7 +429,15 @@ class SecureAuthenticatorUI {
 
     // Menu items
     document.getElementById('export-btn').addEventListener('click', () => this.showExportModal());
-    document.getElementById('import-btn').addEventListener('click', () => this.showImportModal());
+    document.getElementById('import-btn').addEventListener('click', async () => {
+      const inTab = await this.isExtensionTabView();
+      if (!inTab) {
+        chrome.tabs.create({ url: chrome.runtime.getURL('popup.html#import') });
+        window.close();
+        return;
+      }
+      this.showImportModal();
+    });
     document.getElementById('qr-scanner-btn').addEventListener('click', () => this.showQRScannerModal());
     document.getElementById('sounds-toggle-btn').addEventListener('click', () => this.toggleSounds());
     document.getElementById('test-sounds-btn').addEventListener('click', () => this.testSounds());
@@ -412,12 +459,14 @@ class SecureAuthenticatorUI {
     // Settings Modal
     document.getElementById('close-settings-modal-btn').addEventListener('click', () => this.hideSettingsModal());
     document.getElementById('close-settings-btn').addEventListener('click', () => this.hideSettingsModal());
+    this.setupSettingsTabs();
     
     // Settings actions
     document.getElementById('settings-sounds-toggle-btn')?.addEventListener('click', (e) => {
       const enabled = this.sounds.toggle();
-      e.target.textContent = enabled ? 'ON' : 'OFF';
-      document.getElementById('sounds-toggle-btn').textContent = `R2D2 Sounds: ${enabled ? 'ON' : 'OFF'}`;
+      e.target.textContent = enabled ? this.t('ui.on') : this.t('ui.off');
+      this.updateSoundsToggleLabel(enabled);
+      chrome.storage.local.set({ vault_sounds_enabled: enabled });
       if (enabled) this.sounds.playOK();
     });
 
@@ -438,7 +487,10 @@ class SecureAuthenticatorUI {
     document.getElementById('lock-timeout')?.addEventListener('change', async (e) => {
       const timeout = parseInt(e.target.value);
       await chrome.storage.local.set({ vault_lock_timeout: timeout });
-      this.showMessage(`Auto-lock set to ${timeout === 0 ? 'Never' : timeout + ' min'}`, 'success');
+      const valueLabel = timeout === 0
+        ? this.t('ui.never')
+        : this.t('ui.minutes_short', { count: timeout });
+      this.showMessage(this.t('messages.auto_lock_set_to', { value: valueLabel }), 'success');
     });
 
     document.getElementById('theme-select')?.addEventListener('change', async (e) => {
@@ -470,6 +522,368 @@ class SecureAuthenticatorUI {
         this.hideAllModals();
       }
     });
+
+    this.mainListenersBound = true;
+  }
+
+  setupSettingsTabs() {
+    if (this.settingsTabsBound) return;
+    const tabs = Array.from(document.querySelectorAll('.settings-tab'));
+    if (!tabs.length) return;
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        this.setActiveSettingsTab(tab.dataset.settingsTab || 'general');
+      });
+    });
+    this.settingsTabsBound = true;
+  }
+
+  setActiveSettingsTab(tabId) {
+    const tabs = Array.from(document.querySelectorAll('.settings-tab'));
+    const panels = Array.from(document.querySelectorAll('.settings-panel'));
+    tabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.settingsTab === tabId));
+    panels.forEach((panel) => panel.classList.toggle('active', panel.id === `settings-panel-${tabId}`));
+  }
+
+  async initSiteIntegrationControls() {
+    const statusEl = document.getElementById('site-access-status');
+    const grantBtn = document.getElementById('grant-site-access-btn');
+    const revokeBtn = document.getElementById('revoke-site-access-btn');
+
+    if (!statusEl || !grantBtn || !revokeBtn) return;
+
+    // Determine current tab origin.
+    this.siteIntegrationOrigin = null;
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const url = tab?.url ? new URL(tab.url) : null;
+      if (url && (url.protocol === 'http:' || url.protocol === 'https:')) {
+        this.siteIntegrationOrigin = url.origin;
+      }
+    } catch {
+      this.siteIntegrationOrigin = null;
+    }
+
+    const render = async () => {
+      const origin = this.siteIntegrationOrigin;
+      if (!origin) {
+        statusEl.textContent = this.t('messages.site_access_not_available') || 'Site access is not available for this page.';
+        grantBtn.disabled = true;
+        revokeBtn.disabled = true;
+        return;
+      }
+
+      let has = false;
+      try {
+        has = await chrome.permissions.contains({ origins: [`${origin}/*`] });
+      } catch {
+        has = false;
+      }
+
+      statusEl.textContent = has
+        ? (this.t('messages.site_access_enabled', { origin }) || `Enabled for ${origin}`)
+        : (this.t('messages.site_access_disabled', { origin }) || `Disabled for ${origin}`);
+      grantBtn.disabled = has;
+      revokeBtn.disabled = !has;
+    };
+
+    if (!this.siteIntegrationHandlersBound) {
+      grantBtn.addEventListener('click', async () => {
+        const origin = this.siteIntegrationOrigin;
+        if (!origin) return;
+        try {
+          const ok = await chrome.permissions.request({ origins: [`${origin}/*`] });
+          if (!ok) {
+            this.showMessage(this.t('messages.permission_denied') || 'Permission denied', 'error');
+            return;
+          }
+          await this.sendMessage({ type: 'SITE_INTEGRATION_SYNC' });
+          await render();
+          this.showMessage(this.t('messages.site_access_enabled_short') || 'Enabled for this site', 'success');
+        } catch (e) {
+          this.logError(e, 'grantSiteAccess', true, this.t('messages.permission_request_failed') || 'Failed to request permission');
+        }
+      });
+
+      revokeBtn.addEventListener('click', async () => {
+        const origin = this.siteIntegrationOrigin;
+        if (!origin) return;
+        try {
+          const ok = await chrome.permissions.remove({ origins: [`${origin}/*`] });
+          if (!ok) {
+            this.showMessage(this.t('messages.permission_remove_failed') || 'Failed to remove permission', 'error');
+            return;
+          }
+          await this.sendMessage({ type: 'SITE_INTEGRATION_SYNC' });
+          await render();
+          this.showMessage(this.t('messages.site_access_disabled_short') || 'Disabled for this site', 'success');
+        } catch (e) {
+          this.logError(e, 'revokeSiteAccess', true, this.t('messages.permission_remove_failed') || 'Failed to remove permission');
+        }
+      });
+      this.siteIntegrationHandlersBound = true;
+    }
+
+    await render();
+  }
+
+  async initDriveBackupControls() {
+    const statusEl = document.getElementById('drive-status');
+    const healthEl = document.getElementById('drive-health');
+    const connectBtn = document.getElementById('drive-connect-btn');
+    const backupBtn = document.getElementById('drive-backup-now-btn');
+    const restoreBtn = document.getElementById('drive-restore-btn');
+    const passEl = document.getElementById('drive-backup-password');
+
+    if (!statusEl || !healthEl || !connectBtn || !backupBtn || !restoreBtn || !passEl) return;
+
+    const setStatus = (text) => {
+      statusEl.textContent = text || '';
+    };
+    const clearPassword = () => {
+      passEl.value = '';
+    };
+
+    const ensureDriveLib = () => {
+      if (!window.R2D2DriveSync) {
+        throw new Error('Drive sync module not loaded');
+      }
+    };
+
+    const formatDateTime = (iso) => {
+      if (!iso) return '';
+      try {
+        return new Date(iso).toLocaleString();
+      } catch {
+        return '';
+      }
+    };
+
+    const refreshDriveHealth = async (interactive = false) => {
+      ensureDriveLib();
+      try {
+        let token;
+        if (interactive) {
+          token = await window.R2D2DriveSync.getAuthToken(true);
+        } else {
+          token = await window.R2D2DriveSync.getAuthToken(false);
+        }
+
+        const latest = await window.R2D2DriveSync.getLatestBackupMetadata(token);
+        if (latest?.id) {
+          restoreBtn.disabled = false;
+          const when = formatDateTime(latest.modifiedTime);
+          healthEl.textContent = when
+            ? `Drive connected. Latest backup: ${when}`
+            : 'Drive connected. Backup found.';
+        } else {
+          restoreBtn.disabled = true;
+          healthEl.textContent = 'Drive connected. No backup found yet.';
+        }
+      } catch (e) {
+        restoreBtn.disabled = true;
+        healthEl.textContent = this.t('messages.drive_not_connected_hint') || 'Connect Drive to enable backups';
+      }
+    };
+
+    const connect = async () => {
+      ensureDriveLib();
+      setStatus(this.t('messages.drive_connecting') || 'Connecting...');
+      let token;
+      try {
+        token = await window.R2D2DriveSync.getAuthToken(true);
+        setStatus(this.t('messages.drive_connected') || 'Connected');
+      } catch (e) {
+        setStatus(this.t('messages.drive_connect_failed') || 'Failed to connect');
+        throw e;
+      } finally {
+        if (token) {
+          // Keep token cached for non-interactive refresh later, but avoid storing it ourselves.
+        }
+      }
+    };
+
+    const backupNow = async () => {
+      ensureDriveLib();
+      const password = (passEl.value || '').trim();
+      if (!password) {
+        this.showError(this.t('messages.drive_password_required') || 'Backup password is required');
+        return { cancelled: true };
+      }
+
+      setStatus(this.t('messages.drive_backup_in_progress') || 'Backing up...');
+
+      // 1) Get current JSON export from background
+      const exportRes = await this.sendMessage({ type: 'EXPORT_ACCOUNTS' });
+      if (!exportRes?.success) {
+        throw new Error(exportRes?.error || 'Export failed');
+      }
+      const rawJson = exportRes.data.json;
+
+      // 2) Encrypt with user password
+      const vault = new SecureVault();
+      const encrypted = await vault.encryptExport(rawJson, password);
+
+      // 3) Upload to Drive (appDataFolder)
+      let token = await window.R2D2DriveSync.getAuthToken(false).catch(() => window.R2D2DriveSync.getAuthToken(true));
+      try {
+        await window.R2D2DriveSync.uploadBackupJson(token, encrypted);
+        setStatus(this.t('messages.drive_backup_success') || 'Backup saved to Drive');
+        this.sounds.playSuccess();
+        return { ok: true };
+      } catch (e) {
+        // Token can be stale even if getAuthToken(false) returned one.
+        const msg = String(e?.message || '');
+        const shouldRefreshToken = msg.includes('(401)') || msg.includes('(403)');
+        if (shouldRefreshToken) {
+          try {
+            await window.R2D2DriveSync.removeCachedToken(token);
+            token = await window.R2D2DriveSync.getAuthToken(true);
+            await window.R2D2DriveSync.uploadBackupJson(token, encrypted);
+            setStatus(this.t('messages.drive_backup_success') || 'Backup saved to Drive');
+            this.sounds.playSuccess();
+            return { ok: true };
+          } catch (retryErr) {
+            throw retryErr;
+          }
+        }
+        throw e;
+      } finally {
+        // Keep cached token (Chrome manages it).
+      }
+    };
+
+    const restoreLatest = async () => {
+      ensureDriveLib();
+      const password = (passEl.value || '').trim();
+      if (!password) {
+        this.showError(this.t('messages.drive_password_required_restore') || 'Decryption password is required');
+        return { cancelled: true, imported: 0, duplicates: 0 };
+      }
+
+      const confirmed = await this.showConfirm(
+        this.t('ui.drive_restore_title') || 'Restore backup',
+        this.t('ui.drive_restore_confirm') || 'This will import accounts from your latest Drive backup. Continue?'
+      );
+      if (!confirmed) return { cancelled: true, imported: 0, duplicates: 0 };
+
+      setStatus(this.t('messages.drive_restore_in_progress') || 'Restoring...');
+
+      let token = await window.R2D2DriveSync.getAuthToken(false).catch(() => window.R2D2DriveSync.getAuthToken(true));
+      let encrypted;
+      try {
+        encrypted = await window.R2D2DriveSync.downloadBackupJson(token);
+      } catch (e) {
+        const msg = String(e?.message || '');
+        const shouldRefreshToken = msg.includes('(401)') || msg.includes('(403)');
+        if (shouldRefreshToken) {
+          await window.R2D2DriveSync.removeCachedToken(token);
+          token = await window.R2D2DriveSync.getAuthToken(true);
+          encrypted = await window.R2D2DriveSync.downloadBackupJson(token);
+        } else {
+          throw e;
+        }
+      }
+      if (!encrypted) {
+        const msg = this.t('messages.drive_no_backup_found') || 'No backup found in Drive';
+        setStatus(msg);
+        throw new Error(msg);
+      }
+
+      const vault = new SecureVault();
+      let decrypted;
+      try {
+        decrypted = await vault.decryptExport(encrypted, password);
+      } catch (e) {
+        this.showError(this.t('messages.bad_decryption_password_or_corrupt') || 'Wrong password or corrupt backup');
+        setStatus(this.t('messages.drive_restore_failed') || 'Restore failed');
+        throw e;
+      }
+
+      if (!decrypted || !Array.isArray(decrypted.accounts)) {
+        const msg = this.t('messages.invalid_file_format_expected_json') || 'Invalid backup format';
+        setStatus(msg);
+        throw new Error(msg);
+      }
+
+      const importRes = await this.sendMessage({ type: 'IMPORT_ACCOUNTS', data: decrypted });
+      if (!importRes?.success) {
+        throw new Error(importRes?.error || 'Import failed');
+      }
+
+      const imported = Number(importRes.imported || 0);
+      const duplicates = Number(importRes.duplicates || 0);
+      setStatus(
+        imported > 0
+          ? `${this.t('messages.drive_restore_success') || 'Restore complete'} (${imported})`
+          : `${this.t('messages.drive_restore_no_new_accounts') || 'Restore completed with no new accounts'} (${duplicates})`
+      );
+      await this.loadAccounts();
+      await this.loadContextDomainMatches();
+      await this.renderAccounts();
+      this.sounds.playSuccess();
+      return { imported, duplicates };
+    };
+
+    if (!this.driveHandlersBound) {
+      connectBtn.addEventListener('click', async () => {
+        try {
+          await connect();
+          await refreshDriveHealth(false);
+          this.showMessage(this.t('messages.drive_connected_short') || 'Drive connected', 'success');
+        } catch (e) {
+          this.logError(e, 'driveConnect', true, this.t('messages.drive_connect_failed') || 'Failed to connect Drive');
+        }
+      });
+
+      backupBtn.addEventListener('click', async () => {
+        try {
+          const result = await backupNow();
+          if (!result || result.cancelled) {
+            return;
+          }
+          await refreshDriveHealth(false);
+          this.showMessage(this.t('messages.drive_backup_success') || 'Backup saved to Drive', 'success');
+          clearPassword();
+        } catch (e) {
+          this.logError(e, 'driveBackupNow', true, this.t('messages.drive_backup_failed') || 'Drive backup failed');
+          setStatus(`${this.t('messages.drive_backup_failed') || 'Drive backup failed'}: ${e?.message || 'unknown error'}`);
+          clearPassword();
+        }
+      });
+
+      restoreBtn.addEventListener('click', async () => {
+        try {
+          const result = await restoreLatest();
+          if (!result || result.cancelled) {
+            return;
+          }
+          await refreshDriveHealth(false);
+          if (result.imported > 0) {
+            this.showMessage(
+              `${this.t('messages.drive_restore_success') || 'Restore complete'}: ${result.imported}`,
+              'success'
+            );
+          } else {
+            this.showMessage(
+              this.t('messages.drive_restore_no_new_accounts') || 'Restore completed with no new accounts',
+              'info'
+            );
+          }
+          clearPassword();
+        } catch (e) {
+          this.logError(e, 'driveRestore', true, this.t('messages.drive_restore_failed') || 'Drive restore failed');
+          setStatus(`${this.t('messages.drive_restore_failed') || 'Drive restore failed'}: ${e?.message || 'unknown error'}`);
+          clearPassword();
+        }
+      });
+
+      this.driveHandlersBound = true;
+    }
+
+    setStatus(this.t('messages.drive_not_connected_hint') || 'Connect Drive to enable backups');
+    await refreshDriveHealth(false);
   }
 
   async loadAccounts() {
@@ -482,13 +896,71 @@ class SecureAuthenticatorUI {
         this.showView('view-unlock');
         this.setupUnlockHandlers();
       } else {
-        console.error('Failed to load accounts:', response.error);
+        this.logError(response.error || 'Failed to load accounts', 'loadAccounts', false);
         this.accounts = [];
       }
     } catch (error) {
-      console.error('Error loading accounts:', error);
+      this.logError(error, 'loadAccounts', false);
       this.accounts = [];
     }
+  }
+
+  async loadContextDomainMatches() {
+    this.contextDomain = null;
+    // Default posture: hide accounts until context is known or user opts to show all.
+    this.contextRelatedAccountIds = new Set();
+    this.contextFilterEnabled = true;
+
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab || !tab.url) return;
+
+      const url = new URL(tab.url);
+      if (!/^https?:$/.test(url.protocol)) return;
+
+      const domain = (url.hostname || '').toLowerCase();
+      if (!domain) return;
+      this.contextDomain = domain;
+      this.contextFilterEnabled = true;
+
+      const response = await this.sendMessage({
+        type: 'GET_TOTP_CODES_FOR_DOMAIN',
+        domain
+      });
+
+      if (response?.success && Array.isArray(response.accounts)) {
+        this.contextRelatedAccountIds = new Set(
+          response.accounts.map((account) => account.id).filter(Boolean)
+        );
+      }
+    } catch (error) {
+      // Context filtering is a UX enhancement; fail silently.
+      this.contextDomain = null;
+      this.contextRelatedAccountIds = new Set();
+      this.contextFilterEnabled = true;
+    }
+    this.renderContextFilterInfo();
+  }
+
+  renderContextFilterInfo() {
+    const info = document.getElementById('context-filter-info');
+    const label = document.getElementById('context-filter-label');
+    if (!info || !label) return;
+
+    const hasContextFilter =
+      this.contextFilterEnabled &&
+      this.contextRelatedAccountIds instanceof Set &&
+      !this.searchQuery;
+
+    if (!hasContextFilter) {
+      info.style.display = 'none';
+      return;
+    }
+
+    label.textContent = this.contextDomain
+      ? this.t('ui.filtered_by_domain', { domain: this.contextDomain })
+      : (this.t('ui.filtered_by_no_domain') || 'No web domain context. Accounts hidden.');
+    info.style.display = 'flex';
   }
 
   async renderAccounts() {
@@ -518,7 +990,11 @@ class SecureAuthenticatorUI {
         const issuer = (acc.issuer || '').toLowerCase();
         return name.includes(this.searchQuery) || issuer.includes(this.searchQuery);
       });
+    } else if (this.contextFilterEnabled && this.contextRelatedAccountIds instanceof Set) {
+      // If opened from a web domain, limit visible accounts to strict domain matches (possibly none).
+      sortedAccounts = sortedAccounts.filter((acc) => this.contextRelatedAccountIds.has(acc.id));
     }
+    this.renderContextFilterInfo();
 
     if (sortOrder === 'alpha') {
       sortedAccounts.sort((a, b) => {
@@ -528,13 +1004,40 @@ class SecureAuthenticatorUI {
       });
     }
 
+    if (sortedAccounts.length === 0) {
+      accountList.innerHTML = '';
+      accountList.style.display = 'none';
+      emptyState.style.display = 'block';
+      const titleEl = emptyState.querySelector('h2');
+      const subtitleEl = emptyState.querySelector('p');
+      const isContextFilteredEmpty =
+        this.contextFilterEnabled &&
+        this.contextRelatedAccountIds instanceof Set &&
+        !this.searchQuery;
+      if (titleEl) {
+        titleEl.textContent = isContextFilteredEmpty
+          ? (this.contextDomain
+            ? this.t('ui.no_accounts_for_domain')
+            : (this.t('ui.no_accounts_without_domain') || 'Accounts hidden outside websites'))
+          : this.t('ui.no_accounts');
+      }
+      if (subtitleEl) {
+        subtitleEl.textContent = isContextFilteredEmpty
+          ? (this.contextDomain
+            ? this.t('ui.no_accounts_for_domain_subtitle', { domain: this.contextDomain })
+            : (this.t('ui.no_accounts_without_domain_subtitle') || 'Open on an http(s) site or press Show all.'))
+          : this.t('ui.add_first_subtitle');
+      }
+      return;
+    }
+
     accountList.innerHTML = '';
     for (const account of sortedAccounts) {
       try {
         const accountElement = await this.createAccountElement(account);
         accountList.appendChild(accountElement);
       } catch (error) {
-        console.error('Error creating account element for', account.name, ':', error);
+        this.logError(error, `renderAccounts[${account.name}]`, false);
       }
     }
   }
@@ -622,7 +1125,7 @@ class SecureAuthenticatorUI {
 
       return div;
     } catch (error) {
-      console.error('Error in createAccountElement for', account.name, ':', error);
+      this.logError(error, `createAccountElement[${account.name}]`, false);
       throw error;
     }
   }
@@ -659,8 +1162,7 @@ class SecureAuthenticatorUI {
         throw new Error(response.error);
       }
     } catch (error) {
-      console.error('Error incrementing counter:', error);
-      this.showError(this.i18n.t('messages.counter_increment_failed'));
+      this.logError(error, 'incrementCounter', true, this.t('messages.counter_increment_failed'));
     }
   }
 
@@ -724,8 +1226,7 @@ class SecureAuthenticatorUI {
         }
       });
     } catch (err) {
-      console.error('Autofill error:', err);
-      this.showError(`${this.t('messages.autofill_error')}: ${err.message}`);
+      this.logError(err, 'autofillCode', true, this.t('messages.autofill_error'));
     }
   }
 
@@ -744,38 +1245,31 @@ class SecureAuthenticatorUI {
         copyBtn.classList.remove('copied');
       }, 2000);
     }).catch(err => {
-      console.error('Failed to copy code:', err);
-      this.sounds.playError();
-      this.showError(this.t('messages.copy_code_failed'));
+      this.logError(err, 'copyCode', true, this.t('messages.copy_code_failed'));
     });
   }
 
   startTOTPUpdates() {
     this.stopTOTPUpdates();
-    let lastSecond = Math.floor(Date.now() / 1000);
-    
-    const tick = async () => {
-      const nowSeconds = Math.floor(Date.now() / 1000);
-      if (nowSeconds !== lastSecond) {
-        lastSecond = nowSeconds;
-        await this.updateTOTPCodes();
-      } else {
-        // Update only progress bars every frame
-        this.updateProgressBarsOnly();
-      }
-      this._rafId = requestAnimationFrame(tick);
-    };
-    this._rafId = requestAnimationFrame(tick);
+
+    // Render current codes once, then only refresh on each TOTP window rollover.
+    this.updateTOTPCodes();
+    this.scheduleNextCodeRefresh();
+
+    // Keep countdown/progress responsive without running per-frame.
+    this.totpIntervalId = setInterval(() => {
+      this.updateProgressBarsOnly();
+    }, 1000);
   }
 
   stopTOTPUpdates() {
-    if (this._rafId) {
-      cancelAnimationFrame(this._rafId);
-      this._rafId = null;
-    }
     if (this.totpIntervalId) {
       clearInterval(this.totpIntervalId);
       this.totpIntervalId = null;
+    }
+    if (this.codeRefreshTimeoutId) {
+      clearTimeout(this.codeRefreshTimeoutId);
+      this.codeRefreshTimeoutId = null;
     }
   }
 
@@ -833,6 +1327,27 @@ class SecureAuthenticatorUI {
     }
   }
 
+  scheduleNextCodeRefresh() {
+    const totpAccounts = this.accounts.filter((account) => account.type !== 'HOTP');
+    if (totpAccounts.length === 0) {
+      return;
+    }
+
+    const nowMs = Date.now();
+    const msUntilNextWindow = totpAccounts.reduce((minMs, account) => {
+      const periodMs = (account.period || 30) * 1000;
+      const elapsedInWindow = nowMs % periodMs;
+      const remaining = periodMs - elapsedInWindow;
+      return Math.min(minMs, remaining);
+    }, Number.POSITIVE_INFINITY);
+
+    const delay = Math.max(50, Math.min(msUntilNextWindow + 20, 60_000));
+    this.codeRefreshTimeoutId = setTimeout(async () => {
+      await this.updateTOTPCodes();
+      this.scheduleNextCodeRefresh();
+    }, delay);
+  }
+
   showAddAccountModal() {
     this.hideAllModals();
     document.getElementById('add-account-modal').style.display = 'flex';
@@ -843,6 +1358,10 @@ class SecureAuthenticatorUI {
     document.getElementById('add-account-modal').style.display = 'none';
     document.getElementById('add-account-form').reset();
     this.editingAccountId = null;
+    const title = document.querySelector('#add-account-modal .modal-header h2');
+    const submitBtn = document.querySelector('#add-account-form button[type="submit"]');
+    if (title) title.textContent = this.t('ui.add_account');
+    if (submitBtn) submitBtn.textContent = this.t('ui.add_account');
   }
 
   async handleAddAccount(event) {
@@ -867,8 +1386,9 @@ class SecureAuthenticatorUI {
       // Test the secret by generating a code
       await this.totp.generate(accountData.secret);
       
+      const isEditing = Boolean(this.editingAccountId);
       let response;
-      if (this.editingAccountId) {
+      if (isEditing) {
         accountData.id = this.editingAccountId;
         response = await this.sendMessage({
           type: 'UPDATE_ACCOUNT',
@@ -884,17 +1404,15 @@ class SecureAuthenticatorUI {
       if (response.success) {
         this.hideAddAccountModal();
         await this.loadAccounts();
+        await this.loadContextDomainMatches();
         await this.renderAccounts();
         this.sounds.playSuccess();
-        this.showSuccess(this.editingAccountId ? 'account_updated' : 'account_added');
-        this.editingAccountId = null;
+        this.showSuccess(isEditing ? 'account_updated' : 'account_added');
       } else {
         throw new Error(response.error || 'Failed to save account');
       }
     } catch (error) {
-      console.error('Error saving account:', error);
-      this.sounds.playError();
-      this.showError(error.message);
+      this.logError(error, 'handleAddAccount', true, this.t('messages.save_account_failed'));
     }
   }
 
@@ -918,6 +1436,10 @@ class SecureAuthenticatorUI {
     }
 
     this.showAddAccountModal();
+    const title = document.querySelector('#add-account-modal .modal-header h2');
+    const submitBtn = document.querySelector('#add-account-form button[type="submit"]');
+    if (title) title.textContent = this.t('ui.edit_account');
+    if (submitBtn) submitBtn.textContent = this.t('ui.save');
   }
 
   async deleteAccount(accountId) {
@@ -943,8 +1465,7 @@ class SecureAuthenticatorUI {
         throw new Error(response.error || 'Failed to delete account');
       }
     } catch (error) {
-      console.error('Error deleting account:', error);
-      this.showError(error.message);
+      this.logError(error, 'deleteAccount', true, this.t('messages.delete_account_failed'));
     }
   }
 
@@ -966,7 +1487,9 @@ class SecureAuthenticatorUI {
         const textarea = document.getElementById('export-data');
         const passInput = document.getElementById('export-password');
         
+        let exportRenderToken = 0;
         const updateDisplay = async () => {
+          const currentToken = ++exportRenderToken;
           const password = passInput.value;
           const activeTab = document.querySelector('.format-tab.active');
           const format = activeTab ? activeTab.dataset.format : 'json';
@@ -980,12 +1503,15 @@ class SecureAuthenticatorUI {
               try {
                 const vault = new SecureVault();
                 const encrypted = await vault.encryptExport(rawJson, password);
+                if (currentToken !== exportRenderToken) return;
                 textarea.value = JSON.stringify(encrypted, null, 2);
               } catch (e) {
-                console.error('Encryption error:', e);
+                this.logError(e, 'showExportModal/encrypt', false);
+                if (currentToken !== exportRenderToken) return;
                 textarea.value = 'Error encrypting data';
               }
             } else {
+              if (currentToken !== exportRenderToken) return;
               textarea.value = JSON.stringify(rawJson, null, 2);
             }
           }
@@ -1028,9 +1554,7 @@ class SecureAuthenticatorUI {
         await updateDisplay();
       }
     } catch (error) {
-      console.error('Error exporting accounts:', error);
-      this.sounds.playError();
-      this.showError(this.t('messages.export_failed'));
+      this.logError(error, 'showExportModal', true, this.t('messages.export_failed'));
     }
     this.hideMenu();
   }
@@ -1058,6 +1582,28 @@ class SecureAuthenticatorUI {
     this.hideMenu();
   }
 
+  isExpandedTabView() {
+    return window.matchMedia('(min-width: 401px)').matches;
+  }
+
+  isExtensionTabView() {
+    return new Promise((resolve) => {
+      try {
+        chrome.tabs.getCurrent((tab) => {
+          resolve(Boolean(tab && tab.id));
+        });
+      } catch {
+        resolve(false);
+      }
+    });
+  }
+
+  handleStartupRoute() {
+    if (window.location.hash === '#import') {
+      this.showImportModal();
+    }
+  }
+
   async handleImportFile(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -1082,7 +1628,9 @@ class SecureAuthenticatorUI {
     const password = document.getElementById('import-password').value;
     
     try {
-      let dataToImport;
+      if (!importData) {
+        throw this.createImportValidationError(this.t('messages.invalid_file_format_expected_json'));
+      }
       
       // Check if data is in otpauth format
       if (importData.startsWith('otpauth://')) {
@@ -1090,22 +1638,35 @@ class SecureAuthenticatorUI {
           type: 'IMPORT_FROM_OTPAUTH',
           data: importData
         });
-        return this.processImportResponse(response);
+        return await this.processImportResponse(response);
       } 
       
-      // Assume JSON
-      let data = JSON.parse(importData);
+      // Validate JSON before parsing
+      let data;
+      try {
+        // Basic validation to check if content looks like JSON
+        const trimmed = importData.trim();
+        if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+          throw this.createImportValidationError(this.t('messages.invalid_file_format_expected_json'));
+        }
+        data = JSON.parse(importData);
+      } catch (parseError) {
+        if (parseError instanceof SyntaxError) {
+          throw this.createImportValidationError(this.t('messages.invalid_json_format'));
+        }
+        throw parseError;
+      }
       
       // If encrypted, decrypt first
       if (data.encrypted) {
         if (!password) {
-          throw new Error('This backup is encrypted. Please enter the decryption password.');
+          throw this.createImportValidationError(this.t('messages.backup_encrypted_needs_password'));
         }
         const vault = new SecureVault();
         try {
           data = await vault.decryptExport(data, password);
         } catch (e) {
-          throw new Error('Incorrect decryption password or corrupted data');
+          throw this.createImportValidationError(this.t('messages.bad_decryption_password_or_corrupt'));
         }
       }
       
@@ -1114,19 +1675,31 @@ class SecureAuthenticatorUI {
         data: data
       });
       
-      this.processImportResponse(response);
+      await this.processImportResponse(response);
 
     } catch (error) {
-      console.error('Error importing accounts:', error);
-      this.sounds.playError();
-      this.showError(error.message);
+      // Validation errors carry a friendly message; log technical ones only.
+      this.logError(
+        error,
+        'handleImport',
+        true,
+        error?.isImportValidationError ? error.message : this.t('messages.import_failed')
+      );
     }
   }
 
-  processImportResponse(response) {
+  createImportValidationError(message) {
+    const error = new Error(message);
+    error.isImportValidationError = true;
+    return error;
+  }
+
+  async processImportResponse(response) {
     if (response.success) {
       this.hideImportModal();
-      this.loadAccounts().then(() => this.renderAccounts());
+      await this.loadAccounts();
+      await this.loadContextDomainMatches();
+      await this.renderAccounts();
       this.sounds.playSuccess();
       
       let message = `Imported ${response.imported} new accounts`;
@@ -1134,11 +1707,24 @@ class SecureAuthenticatorUI {
         message += ` (${response.duplicates} duplicates skipped)`;
       }
       
-      if (response.errors && response.errors.length > 0) {
+      const hasImportErrors = Array.isArray(response.errors) && response.errors.length > 0;
+      if (hasImportErrors) {
         message += ` (${response.errors.length} failed)`;
         this.showError(message);
       } else {
         this.showSuccess(message);
+      }
+
+      // Import launched from popup opens a dedicated extension tab (#import).
+      // Close that tab only when import is clean (no partial errors),
+      // so the user can inspect warnings when there are failures.
+      const launchedAsImportTab = window.location.hash === '#import';
+      if (launchedAsImportTab && !hasImportErrors) {
+        this.showMessage(
+          this.t('messages.import_complete_closing_tab') || 'Import complete. Closing this tab...',
+          'info'
+        );
+        setTimeout(() => window.close(), 1400);
       }
     } else {
       throw new Error(response.error || 'Failed to import accounts');
@@ -1148,6 +1734,7 @@ class SecureAuthenticatorUI {
   showSettings() {
     this.hideMenu();
     document.getElementById('settings-modal').style.display = 'flex';
+    this.setActiveSettingsTab('general');
     
     // Populate languages if empty
     const langSelect = document.getElementById('language-select');
@@ -1165,7 +1752,17 @@ class SecureAuthenticatorUI {
     }
 
     const countEl = document.getElementById('settings-account-count');
-    if (countEl) countEl.textContent = `${this.accounts.length} accounts`;
+    if (countEl) countEl.textContent = this.t('ui.accounts_count', { count: this.accounts.length });
+    const settingsToggle = document.getElementById('settings-sounds-toggle-btn');
+    if (settingsToggle) {
+      settingsToggle.textContent = this.sounds.enabled ? this.t('ui.on') : this.t('ui.off');
+    }
+
+    // Never keep backup password lingering in UI when reopening settings.
+    const drivePass = document.getElementById('drive-backup-password');
+    if (drivePass) {
+      drivePass.value = '';
+    }
   }
 
   hideSettingsModal() {
@@ -1204,19 +1801,18 @@ class SecureAuthenticatorUI {
         this.showSuccess(this.t('messages.pin_updated_success'));
         this.sounds.playSuccess();
       } else {
-        this.showError(response.error || 'Failed to update PIN');
+        this.showError(response.error || this.t('messages.pin_update_failed'));
         this.sounds.playError();
       }
     } catch (error) {
-      this.showError(this.t('messages.pin_update_error'));
-      console.error(error);
+      this.logError(error, 'handleChangePin', true, this.t('messages.pin_update_error'));
     }
   }
 
   toggleSounds() {
     const enabled = this.sounds.toggle();
-    const button = document.getElementById('sounds-toggle-btn');
-    button.textContent = `R2D2 Sounds: ${enabled ? 'ON' : 'OFF'}`;
+    this.updateSoundsToggleLabel(enabled);
+    chrome.storage.local.set({ vault_sounds_enabled: enabled });
     
     // Play sound feedback when enabling
     if (enabled) {
@@ -1224,6 +1820,13 @@ class SecureAuthenticatorUI {
     }
     
     this.hideMenu();
+  }
+
+  updateSoundsToggleLabel(enabled) {
+    const button = document.getElementById('sounds-toggle-btn');
+    if (!button) return;
+    const state = enabled ? this.t('ui.on') : this.t('ui.off');
+    button.textContent = this.t('ui.r2d2_sounds_state', { state });
   }
 
   testSounds() {
@@ -1340,6 +1943,7 @@ class SecureAuthenticatorUI {
         `;
       }
     } catch (error) {
+      this.logError(error, 'debugTimeSync', false);
       resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
     }
   }
@@ -1360,6 +1964,7 @@ class SecureAuthenticatorUI {
         `;
       }
     } catch (error) {
+      this.logError(error, 'debugTestVectors', false);
       resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
     }
   }
@@ -1399,6 +2004,7 @@ class SecureAuthenticatorUI {
         `;
       }
     } catch (error) {
+      this.logError(error, 'debugAccount', false);
       resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
     }
   }
@@ -1447,6 +2053,7 @@ class SecureAuthenticatorUI {
         `;
       }
     } catch (error) {
+      this.logError(error, 'debugTimeWindow', false);
       resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
     }
   }
@@ -1464,6 +2071,9 @@ class SecureAuthenticatorUI {
   }
 
   showMessage(message, type = 'info') {
+    // Keep a single visible toast to avoid overlapping/conflicting statuses.
+    document.querySelectorAll('.toast').forEach((el) => el.remove());
+
     // Create a toast notification
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
@@ -1617,8 +2227,7 @@ class SecureAuthenticatorUI {
         this.showError(`${this.t('messages.capture_failed')}: ${response?.error || this.t('messages.unknown_error')}`);
       }
     } catch (err) {
-      console.error('Scan tab error:', err);
-      this.showError(`${this.t('messages.capture_error')}: ${err.message}`);
+      this.logError(err, 'scanCurrentTab', true, this.t('messages.capture_error'));
     }
   }
 
@@ -1662,15 +2271,14 @@ class SecureAuthenticatorUI {
           status.textContent = this.t('messages.qr_detected_importing');
           await this.importOtpauthData(qrPayload);
         } catch (error) {
-          this.showError(error.message || this.t('messages.qr_import_failed'));
+          this.logError(error, 'startScan/callback', true, this.t('messages.qr_import_failed'));
         } finally {
           this.resetQRScannerUI();
         }
       });
       
     } catch (error) {
-      console.error('QR Scanner error:', error);
-      this.showError(`${this.t('messages.qr_start_failed')}: ${error.message}`);
+      this.logError(error, 'startQRScanner', true, this.t('messages.qr_start_failed'));
       this.resetQRScannerUI();
     }
   }
@@ -1751,8 +2359,7 @@ class SecureAuthenticatorUI {
       }
       
     } catch (error) {
-      console.error('QR import error:', error);
-      this.showError(`${this.t('messages.qr_import_failed')}: ${error.message}`);
+      this.logError(error, 'importManualQRData', true, this.t('messages.qr_import_failed'));
     }
   }
 
@@ -1766,6 +2373,7 @@ class SecureAuthenticatorUI {
       if (response.success) {
         this.hideQRScannerModal();
         await this.loadAccounts();
+        await this.loadContextDomainMatches();
         await this.renderAccounts();
         this.sounds.playSuccess();
         
@@ -1780,9 +2388,7 @@ class SecureAuthenticatorUI {
         throw new Error(response.error || 'Failed to import QR code');
       }
     } catch (error) {
-      console.error('QR import error:', error);
-      this.sounds.playError();
-      this.showError(error.message);
+      this.logError(error, 'importOtpauthData', true, this.t('messages.qr_import_failed'));
     }
   }
 
@@ -1806,6 +2412,12 @@ class SecureAuthenticatorUI {
   }
 
   setupInactivityLock() {
+    // Don't set up inactivity lock if timeout is 0 (never lock)
+    if (this.inactivityTimeoutMs === 0) {
+      this.clearInactivityLock();
+      return;
+    }
+    
     if (!this.activityEventsBound) {
       const onActivity = () => this.resetInactivityTimer();
       ['click', 'keydown', 'mousemove', 'mousedown', 'touchstart', 'scroll'].forEach((eventName) => {
@@ -1821,6 +2433,11 @@ class SecureAuthenticatorUI {
       clearTimeout(this.inactivityTimeoutId);
     }
     this.inactivityTimeoutId = setTimeout(() => this.handleInactivityTimeout(), this.inactivityTimeoutMs);
+    
+    // Update background's lastInteraction timestamp for coordination
+    this.sendMessage({ type: 'UPDATE_ACTIVITY' }).catch(() => {
+      // Ignore failures - popup might be closing
+    });
   }
 
   clearInactivityLock() {
@@ -1849,6 +2466,45 @@ class SecureAuthenticatorUI {
       manifest.version_name &&
       manifest.version_name.toLowerCase().includes('dev')
     );
+  }
+
+  /**
+   * Gestor centralizado de errores.
+   * En modo desarrollo muestra trazas completas en consola y en el toast.
+   * En producción sólo muestra mensajes amigables al usuario.
+   *
+   * @param {Error|string} error   - El error original o un mensaje.
+   * @param {string}  context      - Dónde ocurrió (ej. 'handleAddAccount').
+   * @param {boolean} showUser     - Si debe mostrarse un toast al usuario.
+   * @param {string|null} userMsg  - Mensaje amigable de fallback (opcional).
+   */
+  logError(error, context = 'General', showUser = true, userMsg = null) {
+    const isDev = this.isDevMode();
+    const errorDetails = error instanceof Error ? error.message : String(error);
+    const stackTrace   = error instanceof Error ? error.stack  : 'No stack trace';
+
+    if (isDev) {
+      console.group(`❌ Error en [${context}]`);
+      console.error('Mensaje:', errorDetails);
+      console.error('Pila:',    stackTrace);
+      console.groupEnd();
+
+      if (showUser) {
+        this.showError(`[DEV] ${context}: ${errorDetails}`);
+      }
+    } else {
+      // En producción sólo se muestra el mensaje amigable.
+      // Aquí se podría enviar a un servidor de telemetría:
+      // this.sendErrorToTelemetry(context, errorDetails);
+      if (showUser) {
+        const displayMsg = userMsg || this.t('messages.unknown_error') || 'Ocurrió un error inesperado.';
+        this.showError(displayMsg);
+      }
+    }
+
+    if (this.sounds && showUser) {
+      this.sounds.playError();
+    }
   }
 
   applyEnvironmentFlags() {

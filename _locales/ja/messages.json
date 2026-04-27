@@ -1,0 +1,154 @@
+{
+  "extension_name": {
+    "message": "R2D2 セキュア認証器",
+    "description": "Name of the extension"
+  },
+  "extension_description": {
+    "message": "100%透明なコードによる安全な2段階認証",
+    "description": "Description of the extension"
+  },
+  "ui_site_integration": {
+    "message": "サイト連携",
+    "description": "Settings section title for per-site integration"
+  },
+  "ui_site_integration_desc": {
+    "message": "選択したサイトでのみ、ページ内の2FAピッカーボタンを有効にします。",
+    "description": "Settings description for site integration"
+  },
+  "ui_enable_for_current_site": {
+    "message": "現在のサイトで有効にする",
+    "description": "Button label to grant permission for current site"
+  },
+  "ui_disable_for_current_site": {
+    "message": "現在のサイトで無効にする",
+    "description": "Button label to revoke permission for current site"
+  },
+  "messages_site_access_not_available": {
+    "message": "このページではサイトアクセスを利用できません。",
+    "description": "Status when current tab is not an http(s) page"
+  },
+  "messages_site_access_enabled": {
+    "message": "{origin} で有効",
+    "description": "Status text when site integration enabled"
+  },
+  "messages_site_access_disabled": {
+    "message": "{origin} で無効",
+    "description": "Status text when site integration disabled"
+  },
+  "messages_site_access_enabled_short": {
+    "message": "このサイトで有効",
+    "description": "Toast text after enabling site integration"
+  },
+  "messages_site_access_disabled_short": {
+    "message": "このサイトで無効",
+    "description": "Toast text after disabling site integration"
+  },
+  "messages_permission_denied": {
+    "message": "権限が拒否されました",
+    "description": "Toast text when user denies permission prompt"
+  },
+  "messages_permission_request_failed": {
+    "message": "権限のリクエストに失敗しました",
+    "description": "Toast text when permission request fails"
+  },
+  "messages_permission_remove_failed": {
+    "message": "権限の削除に失敗しました",
+    "description": "Toast text when permission remove fails"
+  },
+  "ui_drive_backup": {
+    "message": "Google ドライブ バックアップ",
+    "description": "Settings section title for Drive backup"
+  },
+  "ui_drive_backup_desc": {
+    "message": "暗号化されたバックアップをGoogle ドライブのアプリデータ（非表示）に保存します。暗号化パスワードは自身で管理します。",
+    "description": "Settings description for Drive backup"
+  },
+  "ui_drive_connect": {
+    "message": "Google ドライブを接続",
+    "description": "Button label to connect Drive"
+  },
+  "ui_drive_backup_now": {
+    "message": "今すぐバックアップ",
+    "description": "Button label to trigger Drive backup"
+  },
+  "ui_drive_restore": {
+    "message": "最新のバックアップを復元",
+    "description": "Button label to restore from Drive"
+  },
+  "ui_drive_backup_password": {
+    "message": "バックアップ暗号化パスワード",
+    "description": "Label for Drive backup encryption password"
+  },
+  "ui_drive_backup_password_placeholder": {
+    "message": "バックアップの暗号化に使用するパスワード",
+    "description": "Placeholder for Drive backup password"
+  },
+  "ui_drive_restore_title": {
+    "message": "バックアップを復元",
+    "description": "Confirm dialog title for restore"
+  },
+  "ui_drive_restore_confirm": {
+    "message": "最新のドライブバックアップからアカウントをインポートします。続行しますか？",
+    "description": "Confirm dialog text for restore"
+  },
+  "messages_drive_not_connected_hint": {
+    "message": "バックアップを有効にするにはドライブを接続してください",
+    "description": "Initial hint in Drive backup section"
+  },
+  "messages_drive_connecting": {
+    "message": "接続中...",
+    "description": "Status while connecting to Drive"
+  },
+  "messages_drive_connected": {
+    "message": "接続済み",
+    "description": "Status when connected to Drive"
+  },
+  "messages_drive_connected_short": {
+    "message": "ドライブを接続しました",
+    "description": "Toast when Drive connected"
+  },
+  "messages_drive_connect_failed": {
+    "message": "ドライブへの接続に失敗しました",
+    "description": "Message when Drive connect fails"
+  },
+  "messages_drive_password_required": {
+    "message": "バックアップパスワードが必要です",
+    "description": "Message when backup password missing"
+  },
+  "messages_drive_password_required_restore": {
+    "message": "復号パスワードが必要です",
+    "description": "Message when restore password missing"
+  },
+  "messages_drive_backup_in_progress": {
+    "message": "バックアップ中...",
+    "description": "Status while backing up to Drive"
+  },
+  "messages_drive_backup_success": {
+    "message": "バックアップをドライブに保存しました",
+    "description": "Message when backup succeeds"
+  },
+  "messages_drive_backup_failed": {
+    "message": "ドライブバックアップに失敗しました",
+    "description": "Message when backup fails"
+  },
+  "messages_drive_restore_in_progress": {
+    "message": "復元中...",
+    "description": "Status while restoring from Drive"
+  },
+  "messages_drive_restore_success": {
+    "message": "復元が完了しました",
+    "description": "Message when restore succeeds"
+  },
+  "messages_drive_restore_failed": {
+    "message": "ドライブ復元に失敗しました",
+    "description": "Message when restore fails"
+  },
+  "messages_drive_no_backup_found": {
+    "message": "ドライブにバックアップが見つかりませんでした",
+    "description": "Message when no Drive backup exists"
+  },
+  "ui_drive_backup_password_hint": {
+    "message": "このパスワードは保存されません。安全に保管してください。",
+    "description": "Hint under Drive backup password"
+  }
+}

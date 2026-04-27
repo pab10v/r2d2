@@ -78,6 +78,7 @@ const handleDeriveKey = async (payload, id, source) => {
         };
 
         if (source === 'window') {
+            // Sandbox has opaque origin; reply with '*' and let parent validate event.source.
             window.parent.postMessage(response, '*');
         }
     } catch (error) {
@@ -142,6 +143,11 @@ const handleDetectQR = async (payload, id, source) => {
 
 // Handle window messages (iframe in popup)
 window.addEventListener('message', async (event) => {
+    // Sandbox only trusts messages from its parent extension page.
+    // Sandboxed pages have an opaque origin, so validate by `source` only.
+    if (event.source !== window.parent) {
+        return;
+    }
     if (event.data && event.data.action === 'derive_key') {
         await handleDeriveKey(event.data.payload, event.data.id, 'window');
     } else if (event.data && event.data.action === 'detect_qr') {

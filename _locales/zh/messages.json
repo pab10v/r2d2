@@ -1,0 +1,154 @@
+{
+  "extension_name": {
+    "message": "R2D2 安全验证器",
+    "description": "Name of the extension"
+  },
+  "extension_description": {
+    "message": "基于 100% 透明代码的安全双因素身份验证",
+    "description": "Description of the extension"
+  },
+  "ui_site_integration": {
+    "message": "网站集成",
+    "description": "Settings section title for per-site integration"
+  },
+  "ui_site_integration_desc": {
+    "message": "仅在您选择的网站上启用页面内的 2FA 选择器按钮。",
+    "description": "Settings description for site integration"
+  },
+  "ui_enable_for_current_site": {
+    "message": "在当前网站启用",
+    "description": "Button label to grant permission for current site"
+  },
+  "ui_disable_for_current_site": {
+    "message": "在当前网站禁用",
+    "description": "Button label to revoke permission for current site"
+  },
+  "messages_site_access_not_available": {
+    "message": "此页面无法访问网站。",
+    "description": "Status when current tab is not an http(s) page"
+  },
+  "messages_site_access_enabled": {
+    "message": "已为 {origin} 启用",
+    "description": "Status text when site integration enabled"
+  },
+  "messages_site_access_disabled": {
+    "message": "已为 {origin} 禁用",
+    "description": "Status text when site integration disabled"
+  },
+  "messages_site_access_enabled_short": {
+    "message": "已为此网站启用",
+    "description": "Toast text after enabling site integration"
+  },
+  "messages_site_access_disabled_short": {
+    "message": "已为此网站禁用",
+    "description": "Toast text after disabling site integration"
+  },
+  "messages_permission_denied": {
+    "message": "权限被拒绝",
+    "description": "Toast text when user denies permission prompt"
+  },
+  "messages_permission_request_failed": {
+    "message": "请求权限失败",
+    "description": "Toast text when permission request fails"
+  },
+  "messages_permission_remove_failed": {
+    "message": "移除权限失败",
+    "description": "Toast text when permission remove fails"
+  },
+  "ui_drive_backup": {
+    "message": "Google 云端硬盘备份",
+    "description": "Settings section title for Drive backup"
+  },
+  "ui_drive_backup_desc": {
+    "message": "在您的 Google 云端硬盘应用数据（隐藏）中存储加密备份。您可以控制加密密码。",
+    "description": "Settings description for Drive backup"
+  },
+  "ui_drive_connect": {
+    "message": "连接 Google 云端硬盘",
+    "description": "Button label to connect Drive"
+  },
+  "ui_drive_backup_now": {
+    "message": "立即备份",
+    "description": "Button label to trigger Drive backup"
+  },
+  "ui_drive_restore": {
+    "message": "恢复最新备份",
+    "description": "Button label to restore from Drive"
+  },
+  "ui_drive_backup_password": {
+    "message": "备份加密密码",
+    "description": "Label for Drive backup encryption password"
+  },
+  "ui_drive_backup_password_placeholder": {
+    "message": "用于加密备份的密码",
+    "description": "Placeholder for Drive backup password"
+  },
+  "ui_drive_restore_title": {
+    "message": "恢复备份",
+    "description": "Confirm dialog title for restore"
+  },
+  "ui_drive_restore_confirm": {
+    "message": "这将从您最新的云端硬盘备份中导入账号。是否继续？",
+    "description": "Confirm dialog text for restore"
+  },
+  "messages_drive_not_connected_hint": {
+    "message": "连接云端硬盘以启用备份",
+    "description": "Initial hint in Drive backup section"
+  },
+  "messages_drive_connecting": {
+    "message": "正在连接...",
+    "description": "Status while connecting to Drive"
+  },
+  "messages_drive_connected": {
+    "message": "已连接",
+    "description": "Status when connected to Drive"
+  },
+  "messages_drive_connected_short": {
+    "message": "云端硬盘已连接",
+    "description": "Toast when Drive connected"
+  },
+  "messages_drive_connect_failed": {
+    "message": "连接云端硬盘失败",
+    "description": "Message when Drive connect fails"
+  },
+  "messages_drive_password_required": {
+    "message": "需要备份密码",
+    "description": "Message when backup password missing"
+  },
+  "messages_drive_password_required_restore": {
+    "message": "需要解密密码",
+    "description": "Message when restore password missing"
+  },
+  "messages_drive_backup_in_progress": {
+    "message": "正在备份...",
+    "description": "Status while backing up to Drive"
+  },
+  "messages_drive_backup_success": {
+    "message": "备份已保存到云端硬盘",
+    "description": "Message when backup succeeds"
+  },
+  "messages_drive_backup_failed": {
+    "message": "云端硬盘备份失败",
+    "description": "Message when backup fails"
+  },
+  "messages_drive_restore_in_progress": {
+    "message": "正在恢复...",
+    "description": "Status while restoring from Drive"
+  },
+  "messages_drive_restore_success": {
+    "message": "恢复完成",
+    "description": "Message when restore succeeds"
+  },
+  "messages_drive_restore_failed": {
+    "message": "云端硬盘恢复失败",
+    "description": "Message when restore fails"
+  },
+  "messages_drive_no_backup_found": {
+    "message": "在云端硬盘中未找到备份",
+    "description": "Message when no Drive backup exists"
+  },
+  "ui_drive_backup_password_hint": {
+    "message": "此密码不会被存储。请妥善保管。",
+    "description": "Hint under Drive backup password"
+  }
+}

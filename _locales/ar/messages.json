@@ -1,0 +1,154 @@
+{
+  "extension_name": {
+    "message": "R2D2 الموثق الآمن",
+    "description": "Name of the extension"
+  },
+  "extension_description": {
+    "message": "مصادقة ثنائية آمنة بكود شفاف 100%",
+    "description": "Description of the extension"
+  },
+  "ui_site_integration": {
+    "message": "تكامل الموقع",
+    "description": "Settings section title for per-site integration"
+  },
+  "ui_site_integration_desc": {
+    "message": "تمكين زر اختيار 2FA في الصفحة فقط على المواقع التي تختارها.",
+    "description": "Settings description for site integration"
+  },
+  "ui_enable_for_current_site": {
+    "message": "تمكين للموقع الحالي",
+    "description": "Button label to grant permission for current site"
+  },
+  "ui_disable_for_current_site": {
+    "message": "تعطيل للموقع الحالي",
+    "description": "Button label to revoke permission for current site"
+  },
+  "messages_site_access_not_available": {
+    "message": "الوصول إلى الموقع غير متاح لهذه الصفحة.",
+    "description": "Status when current tab is not an http(s) page"
+  },
+  "messages_site_access_enabled": {
+    "message": "ممكن لـ {origin}",
+    "description": "Status text when site integration enabled"
+  },
+  "messages_site_access_disabled": {
+    "message": "معطل لـ {origin}",
+    "description": "Status text when site integration disabled"
+  },
+  "messages_site_access_enabled_short": {
+    "message": "ممكن لهذا الموقع",
+    "description": "Toast text after enabling site integration"
+  },
+  "messages_site_access_disabled_short": {
+    "message": "معطل لهذا الموقع",
+    "description": "Toast text after disabling site integration"
+  },
+  "messages_permission_denied": {
+    "message": "تم رفض الإذن",
+    "description": "Toast text when user denies permission prompt"
+  },
+  "messages_permission_request_failed": {
+    "message": "فشل طلب الإذن",
+    "description": "Toast text when permission request fails"
+  },
+  "messages_permission_remove_failed": {
+    "message": "فشل إزالة الإذن",
+    "description": "Toast text when permission remove fails"
+  },
+  "ui_drive_backup": {
+    "message": "نسخ احتياطي على جوجل درايف",
+    "description": "Settings section title for Drive backup"
+  },
+  "ui_drive_backup_desc": {
+    "message": "تخزين نسخة احتياطية مشفرة في بيانات تطبيق جوجل درايف الخاص بك (مخفية). أنت تتحكم في كلمة مرور التشفير.",
+    "description": "Settings description for Drive backup"
+  },
+  "ui_drive_connect": {
+    "message": "الاتصال بجوجل درايف",
+    "description": "Button label to connect Drive"
+  },
+  "ui_drive_backup_now": {
+    "message": "نسخ احتياطي الآن",
+    "description": "Button label to trigger Drive backup"
+  },
+  "ui_drive_restore": {
+    "message": "استعادة آخر نسخة احتياطية",
+    "description": "Button label to restore from Drive"
+  },
+  "ui_drive_backup_password": {
+    "message": "كلمة مرور تشفير النسخة الاحتياطية",
+    "description": "Label for Drive backup encryption password"
+  },
+  "ui_drive_backup_password_placeholder": {
+    "message": "كلمة المرور المستخدمة لتشفير النسخة الاحتياطية",
+    "description": "Placeholder for Drive backup password"
+  },
+  "ui_drive_restore_title": {
+    "message": "استعادة النسخة الاحتياطية",
+    "description": "Confirm dialog title for restore"
+  },
+  "ui_drive_restore_confirm": {
+    "message": "سيؤدي هذا إلى استيراد الحسابات من آخر نسخة احتياطية على درايف. هل تريد الاستمرار؟",
+    "description": "Confirm dialog text for restore"
+  },
+  "messages_drive_not_connected_hint": {
+    "message": "اتصل بدرايف لتمكين النسخ الاحتياطي",
+    "description": "Initial hint in Drive backup section"
+  },
+  "messages_drive_connecting": {
+    "message": "جاري الاتصال...",
+    "description": "Status while connecting to Drive"
+  },
+  "messages_drive_connected": {
+    "message": "متصل",
+    "description": "Status when connected to Drive"
+  },
+  "messages_drive_connected_short": {
+    "message": "تم الاتصال بدرايف",
+    "description": "Toast when Drive connected"
+  },
+  "messages_drive_connect_failed": {
+    "message": "فشل الاتصال بدرايف",
+    "description": "Message when Drive connect fails"
+  },
+  "messages_drive_password_required": {
+    "message": "كلمة مرور النسخ الاحتياطي مطلوبة",
+    "description": "Message when backup password missing"
+  },
+  "messages_drive_password_required_restore": {
+    "message": "كلمة مرور فك التشفير مطلوبة",
+    "description": "Message when restore password missing"
+  },
+  "messages_drive_backup_in_progress": {
+    "message": "جاري النسخ الاحتياطي...",
+    "description": "Status while backing up to Drive"
+  },
+  "messages_drive_backup_success": {
+    "message": "تم حفظ النسخة الاحتياطية في درايف",
+    "description": "Message when backup succeeds"
+  },
+  "messages_drive_backup_failed": {
+    "message": "فشل النسخ الاحتياطي في درايف",
+    "description": "Message when backup fails"
+  },
+  "messages_drive_restore_in_progress": {
+    "message": "جاري الاستعادة...",
+    "description": "Status while restoring from Drive"
+  },
+  "messages_drive_restore_success": {
+    "message": "اكتملت الاستعادة",
+    "description": "Message when restore succeeds"
+  },
+  "messages_drive_restore_failed": {
+    "message": "فشل الاستعادة من درايف",
+    "description": "Message when restore fails"
+  },
+  "messages_drive_no_backup_found": {
+    "message": "لم يتم العثور على نسخة احتياطية في درايف",
+    "description": "Message when no Drive backup exists"
+  },
+  "ui_drive_backup_password_hint": {
+    "message": "لا يتم تخزين كلمة المرور هذه. احتفظ بها بأمان.",
+    "description": "Hint under Drive backup password"
+  }
+}

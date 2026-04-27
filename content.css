@@ -52,6 +52,37 @@
   transition: background-color 0.2s ease !important;
 }
 
+.secure-auth-picker-item-content {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.secure-auth-picker-account {
+  min-width: 0 !important;
+}
+
+.secure-auth-picker-issuer {
+  font-weight: 500 !important;
+  color: #333 !important;
+  margin-bottom: 2px !important;
+}
+
+.secure-auth-picker-name {
+  font-size: 12px !important;
+  color: #666 !important;
+}
+
+.secure-auth-picker-code {
+  font-family: monospace !important;
+  font-size: 18px !important;
+  font-weight: bold !important;
+  color: #2196f3 !important;
+  letter-spacing: 2px !important;
+  white-space: nowrap !important;
+}
+
 .secure-auth-picker-header {
   font-weight: 600 !important;
   font-size: 14px !important;
@@ -68,6 +99,23 @@
 /* Ensure styles don't interfere with existing page styles */
 .secure-auth-wrapper input {
   padding-right: 40px !important;
+}
+
+.secure-auth-toast {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  color: #fff !important;
+  padding: 12px 20px !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  z-index: 10001 !important;
+  max-width: 300px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.secure-auth-toast-error {
+  background: #f44336 !important;
 }
 
 /* High contrast mode support */
@@ -93,6 +141,11 @@
   .secure-auth-picker-header {
     border-bottom-color: #444 !important;
     color: white !important;
+  }
+
+  .secure-auth-picker-issuer,
+  .secure-auth-picker-name {
+    color: #f3f3f3 !important;
   }
   
   .secure-auth-picker-item:hover {

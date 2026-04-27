@@ -135,7 +135,8 @@ class SecureTOTP {
     const padIndex = cleanBase32.indexOf('=');
     if (padIndex !== -1) {
       const padLength = cleanBase32.length - padIndex;
-      if (padLength > 6 || padLength % 2 !== 0) {
+      const validPaddingLengths = [1, 3, 4, 6];
+      if (!validPaddingLengths.includes(padLength)) {
         throw new Error('Invalid Base32 padding');
       }
     }

@@ -1,0 +1,154 @@
+{
+  "extension_name": {
+    "message": "R2D2 Autenticador Seguro",
+    "description": "Name of the extension"
+  },
+  "extension_description": {
+    "message": "Autenticação de dois fatores segura com código 100% transparente",
+    "description": "Description of the extension"
+  },
+  "ui_site_integration": {
+    "message": "Integração com sites",
+    "description": "Settings section title for per-site integration"
+  },
+  "ui_site_integration_desc": {
+    "message": "Ative o botão de seleção 2FA na página apenas nos sites que você escolher.",
+    "description": "Settings description for site integration"
+  },
+  "ui_enable_for_current_site": {
+    "message": "Ativar para o site atual",
+    "description": "Button label to grant permission for current site"
+  },
+  "ui_disable_for_current_site": {
+    "message": "Desativar para o site atual",
+    "description": "Button label to revoke permission for current site"
+  },
+  "messages_site_access_not_available": {
+    "message": "O acesso ao site não está disponível para esta página.",
+    "description": "Status when current tab is not an http(s) page"
+  },
+  "messages_site_access_enabled": {
+    "message": "Ativado para {origin}",
+    "description": "Status text when site integration enabled"
+  },
+  "messages_site_access_disabled": {
+    "message": "Desativado para {origin}",
+    "description": "Status text when site integration disabled"
+  },
+  "messages_site_access_enabled_short": {
+    "message": "Ativado para este site",
+    "description": "Toast text after enabling site integration"
+  },
+  "messages_site_access_disabled_short": {
+    "message": "Desativado para este site",
+    "description": "Toast text after disabling site integration"
+  },
+  "messages_permission_denied": {
+    "message": "Permissão negada",
+    "description": "Toast text when user denies permission prompt"
+  },
+  "messages_permission_request_failed": {
+    "message": "Falha ao solicitar permissão",
+    "description": "Toast text when permission request fails"
+  },
+  "messages_permission_remove_failed": {
+    "message": "Falha ao remover permissão",
+    "description": "Toast text when permission remove fails"
+  },
+  "ui_drive_backup": {
+    "message": "Backup no Google Drive",
+    "description": "Settings section title for Drive backup"
+  },
+  "ui_drive_backup_desc": {
+    "message": "Armazene um backup criptografado nos dados do seu app Google Drive (oculto). Você controla a senha de criptografia.",
+    "description": "Settings description for Drive backup"
+  },
+  "ui_drive_connect": {
+    "message": "Conectar Google Drive",
+    "description": "Button label to connect Drive"
+  },
+  "ui_drive_backup_now": {
+    "message": "Fazer backup agora",
+    "description": "Button label to trigger Drive backup"
+  },
+  "ui_drive_restore": {
+    "message": "Restaurar backup mais recente",
+    "description": "Button label to restore from Drive"
+  },
+  "ui_drive_backup_password": {
+    "message": "Senha de criptografia de backup",
+    "description": "Label for Drive backup encryption password"
+  },
+  "ui_drive_backup_password_placeholder": {
+    "message": "Senha usada para criptografar o backup",
+    "description": "Placeholder for Drive backup password"
+  },
+  "ui_drive_restore_title": {
+    "message": "Restaurar backup",
+    "description": "Confirm dialog title for restore"
+  },
+  "ui_drive_restore_confirm": {
+    "message": "Isso importará as contas do seu backup mais recente no Drive. Continuar?",
+    "description": "Confirm dialog text for restore"
+  },
+  "messages_drive_not_connected_hint": {
+    "message": "Conecte o Drive para ativar backups",
+    "description": "Initial hint in Drive backup section"
+  },
+  "messages_drive_connecting": {
+    "message": "Conectando...",
+    "description": "Status while connecting to Drive"
+  },
+  "messages_drive_connected": {
+    "message": "Conectado",
+    "description": "Status when connected to Drive"
+  },
+  "messages_drive_connected_short": {
+    "message": "Drive conectado",
+    "description": "Toast when Drive connected"
+  },
+  "messages_drive_connect_failed": {
+    "message": "Falha ao conectar o Drive",
+    "description": "Message when Drive connect fails"
+  },
+  "messages_drive_password_required": {
+    "message": "A senha de backup é obrigatória",
+    "description": "Message when backup password missing"
+  },
+  "messages_drive_password_required_restore": {
+    "message": "A senha de descriptografia é obrigatória",
+    "description": "Message when restore password missing"
+  },
+  "messages_drive_backup_in_progress": {
+    "message": "Fazendo backup...",
+    "description": "Status while backing up to Drive"
+  },
+  "messages_drive_backup_success": {
+    "message": "Backup salvo no Drive",
+    "description": "Message when backup succeeds"
+  },
+  "messages_drive_backup_failed": {
+    "message": "Falha no backup do Drive",
+    "description": "Message when backup fails"
+  },
+  "messages_drive_restore_in_progress": {
+    "message": "Restaurando...",
+    "description": "Status while restoring from Drive"
+  },
+  "messages_drive_restore_success": {
+    "message": "Restauração concluída",
+    "description": "Message when restore succeeds"
+  },
+  "messages_drive_restore_failed": {
+    "message": "Falha na restauração do Drive",
+    "description": "Message when restore fails"
+  },
+  "messages_drive_no_backup_found": {
+    "message": "Nenhum backup encontrado no Drive",
+    "description": "Message when no Drive backup exists"
+  },
+  "ui_drive_backup_password_hint": {
+    "message": "Esta senha não é armazenada. Mantenha-a segura.",
+    "description": "Hint under Drive backup password"
+  }
+}

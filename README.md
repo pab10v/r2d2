@@ -97,7 +97,21 @@ r2d2/
 | **Network** | Secure | Verified 0 network calls (offline) |
 | **Storage** | Secure | Encrypted local storage only (AES-GCM) |
 | **KDF** | Secure | Argon2id implementation (verified vs RFC) |
-| **Telemetry** | Secure | No tracking or analytics detected |
+| **Telemetry** | Secure | No tracking or analytics  |
+
+## Security Notes
+
+- Threat model (storage, SW, content, offscreen/sandbox): `docs/threat-model.md`
+- RFC 6238 regression vectors (SHA1/SHA256/SHA512): `scratch/test_totp_vectors.js`
+
+## Privacy and Permissions
+
+- `storage`: stores encrypted vault data and local preferences.
+- `activeTab` + `scripting`: fills OTP codes in the current page when explicitly requested.
+- `offscreen`: runs isolated Argon2/QR tasks without blocking UI.
+- `contextMenus` + `commands`: optional quick actions for OTP workflows.
+- `notifications`: local success/error status notifications.
+- `host_permissions: <all_urls>`: required to detect OTP inputs across arbitrary login domains. R2D2 does not send page data or secrets to external services.
 
 ## FAQ
 

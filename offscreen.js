@@ -15,6 +15,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         
         // Forward to the sandboxed iframe
         // We use postMessage because the sandbox cannot use chrome.runtime
+        // Sandbox pages have an opaque origin ("null"), so we must use '*' here.
+        // We rely on event.source validation on the way back.
         sandboxFrame.contentWindow.postMessage(message, '*');
     }
 });
@@ -24,7 +26,11 @@ window.addEventListener('message', (event) => {
     const message = event.data;
     
     // Validate message is from our sandbox and intended for background
-    if (message && message.target === 'background') {
+    if (
+        message &&
+        message.target === 'background' &&
+        event.source === sandboxFrame.contentWindow
+    ) {
         console.log('Offscreen: Received response from sandbox, forwarding to background', message.action);
         
         // Forward back to the Background (Service Worker)

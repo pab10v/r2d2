@@ -74,8 +74,10 @@
         <div class="header-actions">
             <button id="add-account-btn" class="btn btn-primary btn-sm" data-i18n="ui.add_account"
                 style="display: none;">+ Add Account</button>
-            <button id="close-tab-btn" class="btn btn-secondary btn-sm" style="display: none; padding: 5px 10px;">Close
-                Tab</button>
+            <button id="close-tab-btn" class="btn btn-secondary btn-sm"
+                style="display: none; padding: 5px 10px;">&times;</button>
+            <!-- cambiar este bonzote por un btoncito elegante-->
+
             <button id="menu-btn" class="menu-btn" style="display: none;">
                 <span></span>
                 <span></span>
@@ -90,8 +92,8 @@
     <div id="view-setup" class="vault-view" style="display:none;">
         <div class="vault-card">
             <div class="vault-icon">🔐</div>
-            <h1 class="vault-title">Welcome to R2D2</h1>
-            <p class="vault-subtitle">Create a PIN to protect your 2FA secrets</p>
+            <h1 class="vault-title" data-i18n="ui.welcome_r2d2">Welcome to R2D2</h1>
+            <p class="vault-subtitle" data-i18n="ui.create_pin_subtitle">Create a PIN to protect your 2FA secrets</p>
             <form id="setup-form" autocomplete="off">
                 <div class="pin-group">
                     <label for="setup-pin" data-i18n="ui.choose_pin">Choose a PIN</label>
@@ -107,7 +109,7 @@
                 <div id="setup-error" class="vault-error" style="display:none;"></div>
                 <button type="submit" class="vault-btn" data-i18n="ui.create_vault">Create Vault</button>
             </form>
-            <p class="vault-note">Your PIN encrypts all secrets with AES-256-GCM.<br>There is no recovery — don't forget
+            <p class="vault-note" data-i18n="ui.pin_note">Your PIN encrypts all secrets with AES-256-GCM.<br>There is no recovery — don't forget
                 it.</p>
         </div>
     </div>
@@ -137,8 +139,8 @@
                     </g>
                 </svg>
             </div>
-            <h1 class="vault-title">R2D2 Locked</h1>
-            <p class="vault-subtitle">Enter your PIN to access your accounts</p>
+            <h1 class="vault-title" data-i18n="ui.r2d2_locked">R2D2 Locked</h1>
+            <p class="vault-subtitle" data-i18n="ui.enter_pin_subtitle">Enter your PIN to access your accounts</p>
             <form id="unlock-form" autocomplete="off">
                 <div class="pin-group">
                     <label for="unlock-pin" data-i18n="ui.pin">PIN</label>
@@ -167,6 +169,11 @@
                     </svg>
                     <input type="text" id="search-accounts" placeholder="Search accounts..."
                         data-i18n-placeholder="ui.search_placeholder">
+                </div>
+                <div id="context-filter-info" class="context-filter-info" style="display: none;">
+                    <span id="context-filter-label"></span>
+                    <button id="show-all-accounts-btn" type="button" class="btn btn-secondary btn-sm"
+                        data-i18n="ui.show_all_accounts">Show all</button>
                 </div>
             </div>
 
@@ -251,7 +258,7 @@
                 <button id="expand-tab-btn" class="dropdown-item" data-i18n="ui.expand_to_tab">Expand to Tab</button>
                 <button id="sounds-toggle-btn" class="dropdown-item">R2D2 Sounds: ON</button>
                 <button id="test-sounds-btn" class="dropdown-item">Test R2D2 Sounds</button>
-                <button id="debug-btn" class="dropdown-item">Debug TOTP</button>
+                <button id="debug-btn" class="dropdown-item" data-i18n="ui.debug_totp">Debug TOTP</button>
                 <button id="settings-btn" class="dropdown-item" data-i18n="ui.settings">Settings</button>
             </div>
 
@@ -263,17 +270,19 @@
                         <button id="close-import-modal-btn" class="close-btn">&times;</button>
                     </div>
                     <div class="form-group">
-                        <label for="import-data">Paste Export Data</label>
+                        <label for="import-data" data-i18n="ui.paste_export_data">Paste Export Data</label>
                         <textarea id="import-data" rows="10"
-                            placeholder="Paste JSON or otpauth:// export data here..."></textarea>
+                            placeholder="Paste JSON or otpauth:// export data here..."
+                            data-i18n-placeholder="ui.paste_export_data_placeholder"></textarea>
                     </div>
                     <div class="form-group" style="padding-top: 0;">
-                        <label for="import-file-input">Or Load from File</label>
+                        <label for="import-file-input" data-i18n="ui.or_load_from_file">Or Load from File</label>
                         <input type="file" id="import-file-input" accept=".json,.txt" class="form-control">
                     </div>
                     <div class="form-group" id="import-password-group" style="margin-bottom: 15px;">
-                        <label for="import-password">Decryption Password (if encrypted)</label>
+                        <label for="import-password" data-i18n="ui.decryption_password">Decryption Password (if encrypted)</label>
                         <input type="password" id="import-password" placeholder="Enter password to decrypt data"
+                            data-i18n-placeholder="ui.enter_decryption_password"
                             class="form-control" style="width: 100%;">
                     </div>
                     <div class="form-actions">
@@ -296,20 +305,22 @@
                         style="background: rgba(244,67,54,0.1); border: 1px solid #f44336; padding: 10px; border-radius: 6px; margin-bottom: 15px; display: flex; align-items: flex-start; gap: 10px;">
                         <span style="font-size: 20px;">⚠️</span>
                         <div style="font-size: 12px; color: #d32f2f;">
-                            <strong>Warning:</strong> This export contains your 2FA secrets. Never share this data or
+                            <strong data-i18n="ui.warning">Warning:</strong> <span data-i18n="ui.export_warning_text">This export contains your 2FA secrets. Never share this data or
                             save it in insecure locations.
+                            </span>
                         </div>
                     </div>
                     <div class="form-group" style="margin-bottom: 15px;">
-                        <label for="export-password">Encryption Password (Optional)</label>
+                        <label for="export-password" data-i18n="ui.encryption_password_optional">Encryption Password (Optional)</label>
                         <input type="password" id="export-password" placeholder="Leave blank for plaintext"
+                            data-i18n-placeholder="ui.leave_blank_plaintext"
                             class="form-control" style="width: 100%;">
-                        <small>If set, the export will be encrypted with AES-256-GCM.</small>
+                        <small data-i18n="ui.export_encryption_hint">If set, the export will be encrypted with AES-256-GCM.</small>
                     </div>
                     <div class="form-group">
-                        <label for="export-data">Export Data</label>
+                        <label for="export-data" data-i18n="ui.export_data">Export Data</label>
                         <textarea id="export-data" rows="8" readonly></textarea>
-                        <small>Save this data securely for backup purposes</small>
+                        <small data-i18n="ui.export_save_securely">Save this data securely for backup purposes</small>
                     </div>
                     <div class="form-actions">
                         <button id="copy-export-btn" class="btn btn-secondary" data-i18n="ui.copy">Copy to
@@ -326,59 +337,90 @@
                         <h2 data-i18n="ui.settings">Settings</h2>
                         <button id="close-settings-modal-btn" class="close-btn">&times;</button>
                     </div>
-                    <div class="form-group" style="margin-top: 15px;">
-                        <h3>Security</h3>
-                        <button id="change-pin-btn" class="btn btn-secondary"
-                            style="margin-top: 10px; width: 100%;">Change PIN</button>
-                        <div style="margin-top: 10px;">
-                            <label for="lock-timeout">Auto-lock timeout</label>
-                            <select id="lock-timeout">
-                                <option value="1">1 minute</option>
-                                <option value="5" selected>5 minutes</option>
-                                <option value="15">15 minutes</option>
-                                <option value="0">Never</option>
-                            </select>
+                    <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+                        <button class="settings-tab active" data-settings-tab="general" data-i18n="ui.general">General</button>
+                        <button class="settings-tab" data-settings-tab="security" data-i18n="ui.security">Security</button>
+                        <button class="settings-tab" data-settings-tab="backup" data-i18n="ui.backup_accounts">Backup</button>
+                    </div>
+
+                    <div class="settings-panel active" id="settings-panel-general">
+                        <div class="form-group" style="margin-top: 15px;">
+                            <h3 data-i18n="ui.preferences">Preferences</h3>
+                            <div style="margin-top: 10px;">
+                                <label for="language-select" data-i18n="ui.language">Language</label>
+                                <select id="language-select"></select>
+                            </div>
+                            <div style="margin-top: 10px;">
+                                <label for="theme-select" data-i18n="ui.theme">Theme</label>
+                                <select id="theme-select">
+                                    <option value="auto" data-i18n="ui.system_default">System Default</option>
+                                    <option value="light" data-i18n="ui.light">Light</option>
+                                    <option value="dark" data-i18n="ui.dark">Dark</option>
+                                </select>
+                            </div>
+                            <div style="margin-top: 10px;">
+                                <label for="sort-order" data-i18n="ui.account_order">Account Order</label>
+                                <select id="sort-order">
+                                    <option value="manual" data-i18n="ui.order_manual_date_added">Manual (Date Added)</option>
+                                    <option value="alpha" data-i18n="ui.order_alphabetical">Alphabetical (A-Z)</option>
+                                </select>
+                            </div>
+                            <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+                                <label style="margin: 0;" data-i18n="ui.r2d2_sounds">R2D2 Sounds</label>
+                                <button id="settings-sounds-toggle-btn" class="btn btn-secondary btn-sm" data-i18n="ui.on">ON</button>
+                            </div>
                         </div>
-                        <div style="margin-top: 15px;">
-                            <button id="sync-time-btn" class="btn btn-secondary"
-                                style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                                <span>🕒</span> Sync Time with Google
-                            </button>
-                            <small id="sync-status"
-                                style="display: block; margin-top: 4px; font-size: 10px; color: #666;"></small>
+                        <div class="form-group" style="margin-top: 15px;">
+                            <h3 data-i18n="ui.about">About</h3>
+                            <small>R2D2 Authenticator v1.5.0</small><br>
+                            <small id="settings-account-count">0 accounts</small>
                         </div>
                     </div>
-                    <div class="form-group" style="margin-top: 15px;">
-                        <h3>Preferences</h3>
-                        <div style="margin-top: 10px;">
-                            <label for="language-select">Language</label>
-                            <select id="language-select"></select>
+
+                    <div class="settings-panel" id="settings-panel-security">
+                        <div class="form-group" style="margin-top: 15px;">
+                            <h3 data-i18n="ui.security">Security</h3>
+                            <button id="change-pin-btn" class="btn btn-secondary" style="margin-top: 10px; width: 100%;" data-i18n="ui.change_pin">Change PIN</button>
+                            <div style="margin-top: 10px;">
+                                <label for="lock-timeout" data-i18n="ui.auto_lock_timeout">Auto-lock timeout</label>
+                                <select id="lock-timeout">
+                                    <option value="1">1 minute</option>
+                                    <option value="5" selected>5 minutes</option>
+                                    <option value="15">15 minutes</option>
+                                    <option value="0">Never</option>
+                                </select>
+                            </div>
+                            <div style="margin-top: 15px;">
+                                <button id="sync-time-btn" class="btn btn-secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                    <span>🕒</span> <span data-i18n="ui.sync_time_google">Sync Time with Google</span>
+                                </button>
+                                <small id="sync-status" style="display: block; margin-top: 4px; font-size: 10px; color: #666;"></small>
+                            </div>
                         </div>
-                        <div style="margin-top: 10px;">
-                            <label for="theme-select">Theme</label>
-                            <select id="theme-select">
-                                <option value="auto">System Default</option>
-                                <option value="light">Light</option>
-                                <option value="dark">Dark</option>
-                            </select>
-                        </div>
-                        <div style="margin-top: 10px;">
-                            <label for="sort-order">Account Order</label>
-                            <select id="sort-order">
-                                <option value="manual">Manual (Date Added)</option>
-                                <option value="alpha">Alphabetical (A-Z)</option>
-                            </select>
-                        </div>
-                        <div
-                            style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
-                            <label style="margin: 0;">R2D2 Sounds</label>
-                            <button id="settings-sounds-toggle-btn" class="btn btn-secondary btn-sm">ON</button>
+                        <div class="form-group" style="margin-top: 15px;">
+                            <h3 data-i18n="ui.site_integration">Site integration</h3>
+                            <small data-i18n="ui.site_integration_desc">Enable the in-page 2FA picker button only on sites you choose.</small>
+                            <button id="grant-site-access-btn" class="btn btn-secondary" style="margin-top: 10px; width: 100%;" data-i18n="ui.enable_for_current_site">Enable for current site</button>
+                            <button id="revoke-site-access-btn" class="btn btn-secondary" style="margin-top: 8px; width: 100%;" data-i18n="ui.disable_for_current_site">Disable for current site</button>
+                            <small id="site-access-status" style="display:block; margin-top:6px; font-size: 10px; color:#666;"></small>
                         </div>
                     </div>
-                    <div class="form-group" style="margin-top: 15px;">
-                        <h3>About</h3>
-                        <small>R2D2 Authenticator v1.5.0</small><br>
-                        <small id="settings-account-count">0 accounts</small>
+
+                    <div class="settings-panel" id="settings-panel-backup">
+                        <div class="form-group" style="margin-top: 15px;">
+                            <h3 data-i18n="ui.drive_backup">Google Drive backup</h3>
+                            <small data-i18n="ui.drive_backup_desc">Store an encrypted backup in your Google Drive app data (hidden). You control the encryption password.</small>
+                            <small id="drive-health" style="display:block; margin-top:6px; font-size: 11px; color:#666;"></small>
+                            <div style="margin-top: 10px;">
+                                <label for="drive-backup-password" data-i18n="ui.drive_backup_password">Backup encryption password</label>
+                                <input type="password" id="drive-backup-password" placeholder="Password used to encrypt backup" data-i18n-placeholder="ui.drive_backup_password_placeholder" class="form-control" style="width: 100%;" autocomplete="off">
+                                <small data-i18n="ui.drive_backup_password_hint">This password is not stored. Keep it safe.</small>
+                            </div>
+                            <button id="drive-connect-btn" class="btn btn-secondary" style="margin-top: 10px; width: 100%;" data-i18n="ui.drive_connect">Connect Google Drive</button>
+                            <button id="drive-backup-now-btn" class="btn btn-secondary" style="margin-top: 8px; width: 100%;" data-i18n="ui.drive_backup_now">Backup now</button>
+                            <button id="drive-restore-btn" class="btn btn-secondary" style="margin-top: 8px; width: 100%;" data-i18n="ui.drive_restore">Restore latest backup</button>
+                            <small id="drive-status" style="display:block; margin-top:6px; font-size: 10px; color:#666;"></small>
+                        </div>
                     </div>
                     <div class="form-actions">
                         <button id="close-settings-btn" class="btn btn-primary" data-i18n="ui.close">Close</button>
@@ -395,18 +437,18 @@
                     </div>
                     <form id="change-pin-form" style="padding: 20px;">
                         <div class="form-group" style="padding: 0; margin-bottom: 15px;">
-                            <label for="current-pin">Current PIN</label>
+                            <label for="current-pin" data-i18n="ui.current_pin">Current PIN</label>
                             <input type="password" id="current-pin" required maxlength="8"
-                                placeholder="Enter current PIN">
+                                placeholder="Enter current PIN" data-i18n-placeholder="ui.enter_current_pin">
                         </div>
                         <div class="form-group" style="padding: 0; margin-bottom: 15px;">
-                            <label for="new-pin">New PIN</label>
-                            <input type="password" id="new-pin" required maxlength="8" placeholder="4-8 digits">
+                            <label for="new-pin" data-i18n="ui.new_pin">New PIN</label>
+                            <input type="password" id="new-pin" required maxlength="8" placeholder="4-8 digits" data-i18n-placeholder="ui.pin_4_8_digits">
                         </div>
                         <div class="form-group" style="padding: 0; margin-bottom: 15px;">
-                            <label for="confirm-new-pin">Confirm New PIN</label>
+                            <label for="confirm-new-pin" data-i18n="ui.confirm_new_pin">Confirm New PIN</label>
                             <input type="password" id="confirm-new-pin" required maxlength="8"
-                                placeholder="Repeat new PIN">
+                                placeholder="Repeat new PIN" data-i18n-placeholder="ui.repeat_new_pin">
                         </div>
                         <div class="form-actions" style="padding: 10px 0 0 0; border: none;">
                             <button type="button" id="cancel-change-pin-btn" class="btn btn-secondary"
@@ -436,7 +478,7 @@
                     <div class="scanner-actions">
                         <button id="start-camera-btn" class="btn btn-primary" data-i18n="ui.start_camera">Start
                             Camera</button>
-                        <button id="stop-camera-btn" class="btn btn-secondary" style="display: none;">Stop
+                        <button id="stop-camera-btn" class="btn btn-secondary" style="display: none;" data-i18n="ui.stop_camera">Stop
                             Camera</button>
                         <button id="scan-tab-btn" class="btn btn-secondary" data-i18n="ui.scan_tab">Scan Tab</button>
                         <button id="manual-input-btn" class="btn btn-secondary" data-i18n="ui.manual_input">Manual
@@ -463,6 +505,7 @@
     <script src="r2d2-sounds.js"></script>
     <script src="totp.js"></script>
     <script src="vault.js"></script>
+    <script src="drive-sync.js"></script>
     <script src="jsqr.js"></script>
     <script src="qr-scanner.js"></script>
     <script src="popup.js"></script>

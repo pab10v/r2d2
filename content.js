@@ -7,6 +7,8 @@ class SecureAuthenticatorContent {
   constructor() {
     this.processedInputs = new Set();
     this.buttonSVG = this.createButtonSVG();
+    this.processTimeout = null;
+    this.observer = null;
     this.init();
   }
 
@@ -19,8 +21,7 @@ class SecureAuthenticatorContent {
     
     // Listen for messages from background script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      this.handleMessage(message, sender, sendResponse);
-      return true;
+      return this.handleMessage(message, sender, sendResponse);
     });
   }
 
@@ -232,18 +233,17 @@ class SecureAuthenticatorContent {
     accounts.forEach(account => {
       const accountItem = document.createElement('div');
       accountItem.className = 'secure-auth-picker-item';
-
       accountItem.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div style="font-weight: 500; color: #333; margin-bottom: 2px;">
+        <div class="secure-auth-picker-item-content">
+          <div class="secure-auth-picker-account">
+            <div class="secure-auth-picker-issuer">
               ${this.escapeHtml(account.issuer || account.name)}
             </div>
-            <div style="font-size: 12px; color: #666;">
+            <div class="secure-auth-picker-name">
               ${this.escapeHtml(account.name)}
             </div>
           </div>
-          <div style="font-family: monospace; font-size: 18px; font-weight: bold; color: #2196F3; letter-spacing: 2px;">
+          <div class="secure-auth-picker-code">
             ${this.formatCode(account.code)}
           </div>
         </div>
@@ -353,20 +353,8 @@ class SecureAuthenticatorContent {
   showError(message) {
     // Create toast notification
     const toast = document.createElement('div');
+    toast.className = 'secure-auth-toast secure-auth-toast-error';
     toast.textContent = message;
-    toast.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #f44336;
-      color: white;
-      padding: 12px 20px;
-      border-radius: 6px;
-      font-weight: 500;
-      z-index: 10001;
-      max-width: 300px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    `;
 
     document.body.appendChild(toast);
 
@@ -379,11 +367,11 @@ class SecureAuthenticatorContent {
    * Observe DOM changes for new input fields
    */
   observeDOM() {
-    const observer = new MutationObserver((mutations) => {
+    this.observer = new MutationObserver((mutations) => {
       let shouldProcess = false;
       
       mutations.forEach((mutation) => {
-        if (mutation.addedNodes.length === 0) {
+        if (mutation.type !== 'childList' || mutation.addedNodes.length === 0) {
           return;
         }
 
@@ -399,15 +387,19 @@ class SecureAuthenticatorContent {
       });
 
       if (shouldProcess) {
-        // Debounce the processing
+        // Debounce aggressively to reduce overhead on noisy SPAs.
         clearTimeout(this.processTimeout);
         this.processTimeout = setTimeout(() => {
           this.processInputs();
-        }, 100);
+        }, 250);
       }
     });
 
-    observer.observe(document.body, {
+    if (!document.body) {
+      return;
+    }
+
+    this.observer.observe(document.body, {
       childList: true,
       subtree: true
     });
@@ -419,6 +411,7 @@ class SecureAuthenticatorContent {
   handleMessage(message, sender, sendResponse) {
     // Handle any messages from background script if needed
     sendResponse({ success: true });
+    return false;
   }
 
   /**
@@ -426,15 +419,37 @@ class SecureAuthenticatorContent {
    */
   sendMessage(message) {
     return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage(message, (response) => {
-        if (chrome.runtime.lastError) {
-          return reject(new Error(chrome.runtime.lastError.message));
+      this.sendMessageWithRetry(message, 1, resolve, reject);
+    });
+  }
+
+  sendMessageWithRetry(message, retriesLeft, resolve, reject) {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        const errorMessage = chrome.runtime.lastError.message || 'Background communication error';
+        const shouldRetry =
+          retriesLeft > 0 &&
+          (errorMessage.includes('Receiving end does not exist') ||
+            errorMessage.includes('Could not establish connection') ||
+            errorMessage.includes('message port closed'));
+
+        if (shouldRetry) {
+          setTimeout(() => {
+            this.sendMessageWithRetry(message, retriesLeft - 1, resolve, reject);
+          }, 120);
+          return;
         }
-        if (response === undefined) {
-          return reject(new Error('No response from background service worker'));
-        }
-        resolve(response);
-      });
+
+        reject(new Error(errorMessage));
+        return;
+      }
+
+      if (response === undefined) {
+        reject(new Error('No response from background service worker'));
+        return;
+      }
+
+      resolve(response);
     });
   }
 }

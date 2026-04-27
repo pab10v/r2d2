@@ -12,6 +12,8 @@ class SecureAuthenticator {
     this.vault = new self.SecureVault();
     this.vault.setExternalDeriver((pw, salt) => this.deriveKeyOffscreen(pw, salt));
     this.domainBindingKey = 'secure_authenticator_domain_bindings';
+    this.siteIntegrationKey = 'r2d2_site_integration_origins';
+    this.contentScriptRegistrationId = 'r2d2_site_integration_v1';
 
     // Initialize time offset from storage
     this.initTimeOffset();
@@ -122,6 +124,9 @@ class SecureAuthenticator {
 
     // Update menus on start
     this.updateContextMenus();
+
+    // Keep content script registration in sync with granted origins.
+    this.syncSiteIntegrationFromPermissions();
   }
 
   /**
@@ -135,6 +140,15 @@ class SecureAuthenticator {
 
     await this.updateLastInteraction();
     try {
+      // ── Activity tracking ──────────────────────────────
+      switch (message.type) {
+        case 'UPDATE_ACTIVITY': {
+          await this.updateLastInteraction();
+          sendResponse({ success: true });
+          return;
+        }
+      }
+      
       // ── Vault management (no auth required) ──────────────────────────────
       switch (message.type) {
         case 'VAULT_STATUS': {
@@ -184,6 +198,16 @@ class SecureAuthenticator {
         case 'ARGON2_DERIVE': {
           this.deriveKeyOffscreen(message.password, message.salt).then(sendResponse);
           return true; // Async
+        }
+
+        case 'SITE_INTEGRATION_SYNC': {
+          this.syncSiteIntegrationFromPermissions().then(() => {
+            sendResponse({ success: true });
+          }).catch((error) => {
+            console.warn('SITE_INTEGRATION_SYNC failed', error);
+            sendResponse({ success: false, error: error.message });
+          });
+          return true;
         }
       }
 
@@ -246,9 +270,9 @@ class SecureAuthenticator {
         }
 
         case 'IMPORT_ACCOUNTS': {
-          await this.importAccounts(message.data);
+          const result = await this.importAccounts(message.data);
           this.updateContextMenus();
-          sendResponse({ success: true });
+          sendResponse({ success: true, ...result });
           break;
         }
 
@@ -320,6 +344,57 @@ class SecureAuthenticator {
       console.error('Background script error:', error);
       sendResponse({ success: false, error: error.message });
     }
+  }
+
+  async syncSiteIntegrationFromPermissions() {
+    // The goal is to only run the persistent in-page UI (`content.js`) on sites the user opted into.
+    // We derive the allowed origins from chrome.permissions (optional_host_permissions granted).
+    let origins = [];
+    try {
+      const perms = await chrome.permissions.getAll();
+      origins = Array.isArray(perms.origins) ? perms.origins : [];
+    } catch (e) {
+      console.warn('Failed to read permissions', e);
+    }
+
+    const allowedOrigins = origins
+      .filter((o) => typeof o === 'string')
+      .filter((o) => o.startsWith('http://') || o.startsWith('https://'))
+      .map((o) => o.endsWith('/') ? o : `${o}/`);
+
+    // Persist for UI display/debug.
+    try {
+      await chrome.storage.local.set({ [this.siteIntegrationKey]: allowedOrigins });
+    } catch (e) {
+      console.warn('Failed to persist site integration origins', e);
+    }
+
+    await this.registerOrUpdateContentScript(allowedOrigins);
+  }
+
+  async registerOrUpdateContentScript(allowedOrigins) {
+    // Remove existing registration if no origins are granted.
+    const matches = (allowedOrigins || []).map((origin) => `${origin}*`);
+
+    try {
+      await chrome.scripting.unregisterContentScripts({ ids: [this.contentScriptRegistrationId] });
+    } catch {
+      // ignore
+    }
+
+    if (matches.length === 0) {
+      return;
+    }
+
+    await chrome.scripting.registerContentScripts([{
+      id: this.contentScriptRegistrationId,
+      js: ['content.js'],
+      css: ['content.css'],
+      matches,
+      runAt: 'document_idle',
+      allFrames: true,
+      persistAcrossSessions: true
+    }]);
   }
 
   async handleCommand(command) {
@@ -472,10 +547,11 @@ class SecureAuthenticator {
 
       // Show up to 5 accounts in the menu
       for (const account of accounts.slice(0, 5)) {
+        const menuTitle = (account.name || account.issuer || '').toString().trim() || 'Unnamed account';
         chrome.contextMenus.create({
           id: `fill-${account.id}`,
           parentId: 'r2d2-root',
-          title: account.name,
+          title: menuTitle,
           contexts: ['editable']
         });
       }
@@ -840,14 +916,85 @@ class SecureAuthenticator {
     }
 
     const accounts = await this.getAccounts();
-    const newAccounts = data.accounts.map(account => ({
-      ...account,
-      id: this.generateId(),
-      createdAt: Date.now()
-    }));
+    const now = Date.now();
+    const validated = [];
+    const errors = [];
+    const duplicates = [];
 
-    const mergedAccounts = [...accounts, ...newAccounts];
+    for (const account of data.accounts) {
+      try {
+        const sanitized = this.validateImportedAccount(account, now);
+        const isDuplicate = accounts.some((existing) =>
+          existing.secret.toLowerCase() === sanitized.secret.toLowerCase() ||
+          (
+            (existing.issuer || '').toLowerCase() === sanitized.issuer.toLowerCase() &&
+            (existing.name || '').toLowerCase() === sanitized.name.toLowerCase()
+          )
+        );
+
+        if (isDuplicate) {
+          duplicates.push(sanitized);
+        } else {
+          validated.push(sanitized);
+        }
+      } catch (error) {
+        errors.push(error.message);
+      }
+    }
+
+    if (validated.length === 0 && errors.length > 0) {
+      throw new Error('Invalid or corrupted import data');
+    }
+
+    const mergedAccounts = [...accounts, ...validated];
     await this.saveAccounts(mergedAccounts);
+
+    return {
+      imported: validated.length,
+      duplicates: duplicates.length,
+      total: mergedAccounts.length,
+      errors
+    };
+  }
+
+  validateImportedAccount(account, createdAt) {
+    if (!account || typeof account !== 'object') {
+      throw new Error('Invalid account entry');
+    }
+
+    const name = (account.name || '').toString().trim();
+    const issuer = (account.issuer || name || '').toString().trim();
+    const secret = (account.secret || '').toString().toUpperCase().replace(/\s/g, '');
+    const algorithm = (account.algorithm || 'SHA1').toString().toUpperCase();
+    const digits = parseInt(account.digits || 6, 10);
+    const period = parseInt(account.period || 30, 10);
+
+    if (!name) throw new Error('Account name is required');
+    if (!secret || !/^[A-Z2-7]+=*$/.test(secret)) {
+      throw new Error(`Invalid secret for account "${name}"`);
+    }
+    if (!['SHA1', 'SHA256', 'SHA512'].includes(algorithm)) {
+      throw new Error(`Invalid algorithm for account "${name}"`);
+    }
+    if (![6, 7, 8].includes(digits)) {
+      throw new Error(`Invalid digits for account "${name}"`);
+    }
+    if (!Number.isInteger(period) || period <= 0) {
+      throw new Error(`Invalid period for account "${name}"`);
+    }
+
+    return {
+      id: this.generateId(),
+      name,
+      issuer,
+      secret,
+      algorithm,
+      digits,
+      period,
+      type: account.type === 'HOTP' ? 'HOTP' : 'TOTP',
+      counter: Number.isInteger(account.counter) ? account.counter : 0,
+      createdAt
+    };
   }
 
   /**

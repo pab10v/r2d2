@@ -35,13 +35,18 @@
     "unlocking": "Unlocking...",
     "locked": "Locked",
     "close": "Close",
+    "save": "Save",
     "copy_to_clipboard": "Copy to Clipboard",
     "copied_short": "Copied",
     "change_pin": "Change PIN",
     "update_pin": "Update PIN",
     "or_scan_qr": "Or Scan QR Code",
     "expand_to_tab": "Expand to Tab",
+    "show_all_accounts": "Show all",
+    "filtered_by_domain": "Showing accounts for {{domain}}",
+    "filtered_by_no_domain": "No web domain context. Accounts hidden.",
     "start_camera": "Start Camera",
+    "stop_camera": "Stop Camera",
     "scan_tab": "Scan Tab",
     "manual_input": "Manual Input",
     "enter_qr_data": "Enter QR Code Data:",
@@ -61,6 +66,10 @@
     "import": "Import",
     "settings": "Settings",
     "no_accounts": "No Accounts Yet",
+    "no_accounts_for_domain": "No accounts for this domain",
+    "no_accounts_for_domain_subtitle": "No saved accounts match {{domain}}",
+    "no_accounts_without_domain": "Accounts hidden outside websites",
+    "no_accounts_without_domain_subtitle": "Open on an http(s) site or press Show all.",
     "add_first": "Add Your First Account",
     "backup_accounts": "Backup Your Accounts",
     "restore_accounts": "Restore Accounts",
@@ -69,6 +78,64 @@
     "delete_account_title": "Delete account?",
     "delete_account_confirm": "Are you sure you want to delete this account? This action cannot be undone.",
     "export_format": "Export Format"
+    ,"paste_export_data": "Paste Export Data"
+    ,"paste_export_data_placeholder": "Paste JSON or otpauth:// export data here..."
+    ,"or_load_from_file": "Or Load from File"
+    ,"decryption_password": "Decryption Password (if encrypted)"
+    ,"enter_decryption_password": "Enter password to decrypt data"
+    ,"warning": "Warning:"
+    ,"export_warning_text": "This export contains your 2FA secrets. Never share this data or save it in insecure locations."
+    ,"encryption_password_optional": "Encryption Password (Optional)"
+    ,"leave_blank_plaintext": "Leave blank for plaintext"
+    ,"export_encryption_hint": "If set, the export will be encrypted with AES-256-GCM."
+    ,"export_data": "Export Data"
+    ,"export_save_securely": "Save this data securely for backup purposes"
+    ,"general": "General"
+    ,"security": "Security"
+    ,"auto_lock_timeout": "Auto-lock timeout"
+    ,"preferences": "Preferences"
+    ,"language": "Language"
+    ,"theme": "Theme"
+    ,"account_order": "Account Order"
+    ,"r2d2_sounds": "R2D2 Sounds"
+    ,"about": "About"
+    ,"syncing": "Syncing..."
+    ,"never": "Never"
+    ,"minutes_short": "{{count}} min"
+    ,"on": "ON"
+    ,"off": "OFF"
+    ,"r2d2_sounds_state": "R2D2 Sounds: {{state}}"
+    ,"accounts_count": "{{count}} accounts"
+    ,"welcome_r2d2": "Welcome to R2D2"
+    ,"create_pin_subtitle": "Create a PIN to protect your 2FA secrets"
+    ,"pin_note": "Your PIN encrypts all secrets with AES-256-GCM. There is no recovery - do not forget it."
+    ,"r2d2_locked": "R2D2 Locked"
+    ,"enter_pin_subtitle": "Enter your PIN to access your accounts"
+    ,"sync_time_google": "Sync Time with Google"
+    ,"system_default": "System Default"
+    ,"light": "Light"
+    ,"dark": "Dark"
+    ,"order_manual_date_added": "Manual (Date Added)"
+    ,"order_alphabetical": "Alphabetical (A-Z)"
+    ,"current_pin": "Current PIN"
+    ,"enter_current_pin": "Enter current PIN"
+    ,"new_pin": "New PIN"
+    ,"confirm_new_pin": "Confirm New PIN"
+    ,"repeat_new_pin": "Repeat new PIN"
+    ,"site_integration": "Site integration"
+    ,"site_integration_desc": "Enable the in-page 2FA picker button only on sites you choose."
+    ,"enable_for_current_site": "Enable for current site"
+    ,"disable_for_current_site": "Disable for current site"
+    ,"drive_backup": "Google Drive backup"
+    ,"drive_backup_desc": "Store an encrypted backup in your Google Drive app data (hidden). You control the encryption password."
+    ,"drive_connect": "Connect Google Drive"
+    ,"drive_backup_now": "Backup now"
+    ,"drive_restore": "Restore latest backup"
+    ,"drive_backup_password": "Backup encryption password"
+    ,"drive_backup_password_placeholder": "Password used to encrypt backup"
+    ,"drive_backup_password_hint": "This password is not stored. Keep it safe."
+    ,"drive_restore_title": "Restore backup"
+    ,"drive_restore_confirm": "This will import accounts from your latest Drive backup. Continue?"
   },
   "messages": {
     "account_added": "Account added successfully!",
@@ -110,7 +177,44 @@
     "new_pins_no_match": "New PINs do not match",
     "new_pin_min_length": "New PIN must be at least 4 digits",
     "pin_updated_success": "PIN updated successfully",
-    "pin_update_error": "Error updating PIN"
+    "pin_update_error": "Error updating PIN",
+    "sync_success_drift": "Success! Drift: {{seconds}}s",
+    "too_many_attempts_wait": "Too many attempts. Wait {{seconds}} seconds.",
+    "incorrect_pin": "Incorrect PIN",
+    "attempts_remaining": "{{count}} attempts remaining",
+    "auto_lock_set_to": "Auto-lock set to {{value}}",
+    "invalid_file_format_expected_json": "Invalid file format. Expected JSON format.",
+    "invalid_json_format": "Invalid JSON format. Please ensure the file contains valid JSON data.",
+    "backup_encrypted_needs_password": "This backup is encrypted. Please enter the decryption password.",
+    "bad_decryption_password_or_corrupt": "Incorrect decryption password or corrupted data",
+    "pin_update_failed": "Failed to update PIN",
+    "save_account_failed": "Failed to save the account",
+    "delete_account_failed": "Failed to delete the account",
+    "import_failed": "Failed to import accounts"
+    ,"site_access_not_available": "Site access is not available for this page."
+    ,"site_access_enabled": "Enabled for {{origin}}"
+    ,"site_access_disabled": "Disabled for {{origin}}"
+    ,"site_access_enabled_short": "Enabled for this site"
+    ,"site_access_disabled_short": "Disabled for this site"
+    ,"permission_denied": "Permission denied"
+    ,"permission_request_failed": "Failed to request permission"
+    ,"permission_remove_failed": "Failed to remove permission"
+    ,"drive_not_connected_hint": "Connect Drive to enable backups"
+    ,"drive_connecting": "Connecting..."
+    ,"drive_connected": "Connected"
+    ,"drive_connected_short": "Drive connected"
+    ,"drive_connect_failed": "Failed to connect Drive"
+    ,"drive_password_required": "Backup password is required"
+    ,"drive_password_required_restore": "Decryption password is required"
+    ,"drive_backup_in_progress": "Backing up..."
+    ,"drive_backup_success": "Backup saved to Drive"
+    ,"drive_backup_failed": "Drive backup failed"
+    ,"drive_restore_in_progress": "Restoring..."
+    ,"drive_restore_success": "Restore complete"
+    ,"drive_restore_failed": "Drive restore failed"
+    ,"drive_no_backup_found": "No backup found in Drive"
+    ,"drive_restore_no_new_accounts": "Restore completed with no new accounts"
+    ,"import_complete_closing_tab": "Import complete. Closing this tab..."
   },
   "security": {
     "offline_only": "Works completely offline",

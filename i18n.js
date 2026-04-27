@@ -9,6 +9,7 @@ class R2D2I18n {
     this.fallbackLocale = 'en';
     this.translations = new Map();
     this.loadedLocales = new Set();
+    this.supportedLocales = new Set(['en', 'es', 'fr', 'de', 'ja', 'zh', 'it', 'pt', 'hi', 'ar']);
   }
 
   async init() {
@@ -69,11 +70,16 @@ class R2D2I18n {
     // Extract primary language code
     const primaryLang = browserLang.split('-')[0];
     
-    // Return mapped language or fallback to English
-    return langMap[browserLang] || langMap[primaryLang] || 'en';
+    // Return mapped supported language or fallback to English
+    const mapped = langMap[browserLang] || langMap[primaryLang] || 'en';
+    return this.supportedLocales.has(mapped) ? mapped : this.fallbackLocale;
   }
 
   async loadTranslations(locale) {
+    if (!this.supportedLocales.has(locale)) {
+      return;
+    }
+
     if (this.loadedLocales.has(locale)) {
       return; // Already loaded
     }
@@ -169,14 +175,12 @@ class R2D2I18n {
       { code: 'es', name: 'Español' },
       { code: 'fr', name: 'Français' },
       { code: 'de', name: 'Deutsch' },
+      { code: 'ja', name: '日本語' },
+      { code: 'zh', name: '中文' },
       { code: 'it', name: 'Italiano' },
       { code: 'pt', name: 'Português' },
-      { code: 'ja', name: 'Japanese' },
-      { code: 'ko', name: 'Korean' },
-      { code: 'zh', name: 'Chinese' },
-      { code: 'ru', name: 'Russian' },
-      { code: 'ar', name: 'Arabic' },
-      { code: 'hi', name: 'Hindi' }
+      { code: 'hi', name: 'हिन्दी' },
+      { code: 'ar', name: 'العربية' }
     ];
   }
 

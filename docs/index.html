@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R2D2 Secure Authenticator</title>
+    <meta name="description" content="Secure two-factor authentication with 100% transparent code. Offline by default, Argon2id encryption, and no telemetry.">
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --bg-color: #0f172a;
+            --surface: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent: #38bdf8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Navigation */
+        nav {
+            padding: 2rem 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo span {
+            color: var(--accent);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 6rem 0;
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            margin-bottom: 2.5rem;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: var(--surface);
+            color: white;
+            border: 1px solid var(--border);
+            margin-left: 1rem;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--border);
+            transform: translateY(-2px);
+        }
+
+        /* Features Grid */
+        .features {
+            padding: 4rem 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background-color: var(--surface);
+            padding: 2rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            transition: transform 0.2s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+
+        .feature-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--accent);
+        }
+
+        .feature-card p {
+            color: var(--text-muted);
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 6rem;
+            padding: 3rem 0;
+            border-top: 1px solid var(--border);
+            background-color: var(--surface);
+            text-align: center;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: color 0.2s ease;
+        }
+
+        .footer-links a:hover {
+            color: white;
+            text-decoration: underline;
+        }
+
+        .footer-text {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            .btn-secondary {
+                margin-left: 0;
+                margin-top: 1rem;
+            }
+            .footer-links {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <nav>
+            <div class="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent);">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                R2D2 <span>Authenticator</span>
+            </div>
+            <div>
+                <a href="https://github.com/pab10v/r2d2" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">View on GitHub</a>
+            </div>
+        </nav>
+
+        <section class="hero">
+            <h1>Where trust is transparent code.</h1>
+            <p>A secure, transparent, and high-performance two-factor authentication extension built from the ground up with 100% visible and auditable source code. No black boxes, no telemetry, no compromises.</p>
+            <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 1rem;">
+                <a href="#" class="btn btn-primary">Add to Chrome</a>
+                <a href="https://github.com/pab10v/r2d2" class="btn btn-secondary">Audit Source Code</a>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="feature-card">
+                <h3>🛡️ Argon2id Hardening</h3>
+                <p>Master key derivation using Argon2id via WebAssembly. State-of-the-art hashing resistance against GPU and ASIC brute-force attacks.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🔒 Military-Grade Encryption</h3>
+                <p>Your secrets never leave your device unencrypted. We use AES-256-GCM (Authenticated Encryption with Associated Data) to keep your vault completely secure.</p>
+            </div>
+            <div class="feature-card">
+                <h3>☁️ Drive Backup (Optional)</h3>
+                <p>Store an end-to-end encrypted backup directly in your hidden Google Drive App Data folder. Only you possess the decryption password.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🌐 Fully Offline by Default</h3>
+                <p>No telemetry, no external tracking, no forced cloud sync. R2D2 works completely offline to generate your 2FA codes reliably and securely.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🌍 100% Transparent</h3>
+                <p>Every line of code is open-source. Zero third-party dependencies or external libraries that could be compromised.</p>
+            </div>
+            <div class="feature-card">
+                <h3>⏱️ Smart Time Sync</h3>
+                <p>Having issues with 2FA codes due to clock drift? R2D2 automatically synchronizes with server time securely to fix validation errors.</p>
+            </div>
+        </section>
+    </div>
+
+    <footer>
+        <div class="container">
+            <div class="footer-links">
+                <!-- REQUIRED FOR GOOGLE OAUTH / CHROME WEB STORE -->
+                <a href="legal/PRIVACY_POLICY.md">Privacy Policy</a>
+                <a href="legal/TERMS_OF_SERVICE.md">Terms of Service</a>
+                <a href="https://github.com/pab10v/r2d2/issues">Support / Report Issue</a>
+            </div>
+            <p class="footer-text">
+                &copy; 2026 R2D2 Secure Authenticator. Released under the MIT License.<br>
+                Open Source and built for uncompromising security.
+            </p>
+        </div>
+    </footer>
+
+</body>
+</html>
